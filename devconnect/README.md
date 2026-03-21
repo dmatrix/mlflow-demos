@@ -2,6 +2,18 @@
 
 A multi-turn conversational agent that researches restaurants using live web search, evaluated with **MLflow session-level judges**. The agent demonstrates how to build, trace, and score a tool-augmented LLM application end-to-end.
 
+![restaurant_food_bot](./restaurant_research_bot/images/restaurant_food_bot.png)
+
+This multi-turn conversational agent can be used by **Caspers Kitchens'** clients or customers, caterers, or anyone interested in researching restaurants catered by kitches such as 
+**Caspers Kitchens** for the following scenarios:
+
+* **Food allergies** — identify dishes and restaurants that accommodate specific dietary restrictions (e.g. peanut-free, gluten-free, vegan)
+* **Restaurant ratings & recommendations** — discover highly rated restaurants by neighborhood, cuisine, or preference
+* **Food safety inspections** — look up health inspection scores and recent violation reports for a specific restaurant
+* **Menu & hours** — find current operating hours, menus, and vegetarian or allergen-friendly options
+* **Personalized recommendations** — get synthesized advice across multiple turns, with the agent remembering your preferences throughout the conversation
+
+
 ## What the demo shows
 
 - **Tool-use loop** — the agent calls `web_search()` (Tavily) when it needs current data, feeds results back, and loops until the LLM produces a final answer
