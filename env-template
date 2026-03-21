@@ -1,0 +1,14 @@
+# MLflow GenAI Tutorial Configuration
+
+OPENAI_API_KEY=sk-...
+OPENAI_API_BASE=https://api.openai.com/v1
+
+# Tavily keys
+TAVILY_API_KEY=tvly-...
+
+# MLflow Configuration
+MLFLOW_TRACKING_URI=http://localhost:5000
+
+# Databricks Configuration
+DATABRICKS_HOST=https://<your-workspace>.cloud.databricks.com
+DATABRICKS_TOKEN=dapi...
