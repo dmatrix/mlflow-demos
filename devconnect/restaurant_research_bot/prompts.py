@@ -1,14 +1,35 @@
 """
 Prompts for the web-search multi-turn bot.
 
-Contains:
-- System prompt with explicit search query construction guidance
-- Session-level judge instructions (all use {{ conversation }} template)
+Each prompt is registered in the MLflow Prompt Registry under a unique name
+and always fetched from the registry by that name. The Python source holds the
+initial template text; once registered, the registry copy is authoritative and
+can be edited via the MLflow UI without changing code.
+
+Prompt names
+------------
+SYSTEM_PROMPT_NAME           system-prompt
+COHERENCE_JUDGE_NAME         judge-conversation-coherence
+CONTEXT_RETENTION_JUDGE_NAME judge-context-retention
+SEARCH_QUALITY_JUDGE_NAME    judge-search-quality
 """
 
+import mlflow
 
-def get_system_prompt() -> str:
-    return """You are a helpful assistant that can search the web to answer questions.
+# ---------------------------------------------------------------------------
+# Registry name constants
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT_NAME           = "system-prompt"
+COHERENCE_JUDGE_NAME         = "judge-conversation-coherence"
+CONTEXT_RETENTION_JUDGE_NAME = "judge-context-retention"
+SEARCH_QUALITY_JUDGE_NAME    = "judge-search-quality"
+
+# ---------------------------------------------------------------------------
+# Template source strings (used only for initial registration)
+# ---------------------------------------------------------------------------
+
+_SYSTEM_PROMPT_TEMPLATE = """You are a helpful assistant that can search the web to answer questions.
 
 Guidelines:
 - Use the web_search tool when you need current information, specific facts,
@@ -36,9 +57,7 @@ Good (resolves the reference): web_search("Piccolo Sogno Chicago hours")
 Always resolve pronouns, implicit references, and prior constraints into the query itself.
 """
 
-
-def get_coherence_judge_instructions() -> str:
-    return """Evaluate the coherence of this multi-turn conversation where the assistant
+_COHERENCE_TEMPLATE = """Evaluate the coherence of this multi-turn conversation where the assistant
 can search the web for information.
 
 {{ conversation }}
@@ -53,9 +72,7 @@ Value: True if coherent, False if there are significant coherence issues.
 Rationale: 2-3 sentences on flow, consistency, and synthesis quality.
 """
 
-
-def get_context_retention_judge_instructions() -> str:
-    return """Evaluate context retention in this multi-turn conversation.
+_CONTEXT_RETENTION_TEMPLATE = """Evaluate context retention in this multi-turn conversation.
 
 {{ conversation }}
 
@@ -71,9 +88,7 @@ Value: excellent, good, fair, or poor.
 Rationale: Cite specific turns where context was or wasn't retained correctly.
 """
 
-
-def get_search_quality_judge_instructions() -> str:
-    return """Evaluate web search usage in this multi-turn conversation.
+_SEARCH_QUALITY_TEMPLATE = """Evaluate web search usage in this multi-turn conversation.
 
 {{ conversation }}
 
@@ -89,3 +104,61 @@ SKIPPED: Under-searched -- answered with confident specifics (hours, prices,
 Value: necessary, unnecessary, or skipped.
 Rationale: Cite specific turns where search use was appropriate or not.
 """
+
+# ---------------------------------------------------------------------------
+# Registration (idempotent)
+# ---------------------------------------------------------------------------
+
+def _register_if_missing(name: str, template: str, commit_message: str) -> None:
+    """Register a prompt only if it does not already exist in the registry."""
+    if mlflow.genai.load_prompt(name, allow_missing=True) is None:
+        mlflow.genai.register_prompt(name, template, commit_message=commit_message)
+
+
+def register_all_prompts() -> None:
+    """
+    Register all four prompts in the MLflow Prompt Registry.
+
+    Safe to call multiple times — each prompt is only registered on the first
+    call. Subsequent calls are no-ops (the registry copy is not overwritten).
+    """
+    _register_if_missing(
+        SYSTEM_PROMPT_NAME,
+        _SYSTEM_PROMPT_TEMPLATE,
+        "Agent system prompt with search query construction guidance",
+    )
+    _register_if_missing(
+        COHERENCE_JUDGE_NAME,
+        _COHERENCE_TEMPLATE,
+        "Session-level judge: conversation coherence (bool)",
+    )
+    _register_if_missing(
+        CONTEXT_RETENTION_JUDGE_NAME,
+        _CONTEXT_RETENTION_TEMPLATE,
+        "Session-level judge: context retention (excellent/good/fair/poor)",
+    )
+    _register_if_missing(
+        SEARCH_QUALITY_JUDGE_NAME,
+        _SEARCH_QUALITY_TEMPLATE,
+        "Session-level judge: search quality (necessary/unnecessary/skipped)",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public accessors — always fetch from the registry by name
+# ---------------------------------------------------------------------------
+
+def get_system_prompt() -> str:
+    return mlflow.genai.load_prompt(SYSTEM_PROMPT_NAME).template
+
+
+def get_coherence_judge_instructions() -> str:
+    return mlflow.genai.load_prompt(COHERENCE_JUDGE_NAME).template
+
+
+def get_context_retention_judge_instructions() -> str:
+    return mlflow.genai.load_prompt(CONTEXT_RETENTION_JUDGE_NAME).template
+
+
+def get_search_quality_judge_instructions() -> str:
+    return mlflow.genai.load_prompt(SEARCH_QUALITY_JUDGE_NAME).template
