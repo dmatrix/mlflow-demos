@@ -72,8 +72,8 @@ Used to access Databricks-hosted models (Foundation Model APIs).
 
 1. Open your Databricks workspace
 2. Click your username in the top-right → **Settings** → **Developer** → **Access tokens**
-3. Click **Generate new token**, set a lifetime, copy the token (starts with `dapi`)
-4. Copy your workspace URL from the browser address bar (e.g. `https://adb-123.azuredatabricks.net`)
+3. Click **Generate new token**, set a lifetime, and copy the token (starts with `dapi`)
+4. Copy your workspace URL from the browser address bar (e.g., `ttps://<your-workspace>.cloud.databricks.com`)
 
 ```
 DATABRICKS_HOST=https://<your-workspace>.cloud.databricks.com
@@ -111,7 +111,7 @@ All three run modes require a running MLflow server to store traces and evaluati
 mlflow server --backend-store-uri sqlite:///mlflow.db --port 5000
 ```
 
-Open the UI at [http://localhost:5000](http://localhost:5000). After a run you will see a `restaurant-research-bot` experiment with one MLflow run per scenario.
+Open the UI at [http://localhost:5000](http://localhost:5000). After a run, you will see a `restaurant-research-bot` experiment with one MLflow run per scenario.
 
 ---
 
@@ -130,7 +130,7 @@ uv run mlflow-restaurant-research-bot --scenario allergen
 uv run mlflow-restaurant-research-bot --scenario nosearch
 
 # Override model
-uv run mlflow-restaurant-research-bot --model gpt-4o
+uv run mlflow-restaurant-research-bot --model gpt-5-mini
 
 # Print evaluation DataFrame columns and raw results
 uv run mlflow-restaurant-research-bot --debug
