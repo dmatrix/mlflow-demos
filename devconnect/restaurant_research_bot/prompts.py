@@ -8,10 +8,10 @@ can be edited via the MLflow UI without changing code.
 
 Prompt names
 ------------
-SYSTEM_PROMPT_NAME           system-prompt
-COHERENCE_JUDGE_NAME         judge-conversation-coherence
-CONTEXT_RETENTION_JUDGE_NAME judge-context-retention
-SEARCH_QUALITY_JUDGE_NAME    judge-search-quality
+SYSTEM_PROMPT_NAME           system_prompt
+COHERENCE_JUDGE_NAME         judge_conversation_coherence
+CONTEXT_RETENTION_JUDGE_NAME judge_context_retention
+SEARCH_QUALITY_JUDGE_NAME    judge_search_quality
 """
 
 import mlflow
@@ -20,10 +20,10 @@ import mlflow
 # Registry name constants
 # ---------------------------------------------------------------------------
 
-SYSTEM_PROMPT_NAME           = "system-prompt"
-COHERENCE_JUDGE_NAME         = "judge-conversation-coherence"
-CONTEXT_RETENTION_JUDGE_NAME = "judge-context-retention"
-SEARCH_QUALITY_JUDGE_NAME    = "judge-search-quality"
+SYSTEM_PROMPT_NAME           = "system_prompt"
+COHERENCE_JUDGE_NAME         = "judge_conversation_coherence"
+CONTEXT_RETENTION_JUDGE_NAME = "judge_context_retention"
+SEARCH_QUALITY_JUDGE_NAME    = "judge_search_quality"
 
 # ---------------------------------------------------------------------------
 # Template source strings (used only for initial registration)
