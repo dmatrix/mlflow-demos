@@ -130,6 +130,11 @@ def _fqn(base_name: str) -> str:
     return f"{_uc_prefix}.{base_name}" if _uc_prefix else base_name
 
 
+def _prompt_uri(base_name: str) -> str:
+    """Return a 'prompts:/' URI that resolves to the latest version."""
+    return f"prompts:/{_fqn(base_name)}@latest"
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -165,20 +170,20 @@ def register_all_prompts() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Public accessors — always fetch from the registry by name
+# Public accessors — always fetch the latest version from the registry
 # ---------------------------------------------------------------------------
 
 def get_system_prompt() -> str:
-    return mlflow.genai.load_prompt(_fqn(SYSTEM_PROMPT_NAME)).template
+    return mlflow.genai.load_prompt(_prompt_uri(SYSTEM_PROMPT_NAME)).template
 
 
 def get_coherence_judge_instructions() -> str:
-    return mlflow.genai.load_prompt(_fqn(COHERENCE_JUDGE_NAME)).template
+    return mlflow.genai.load_prompt(_prompt_uri(COHERENCE_JUDGE_NAME)).template
 
 
 def get_context_retention_judge_instructions() -> str:
-    return mlflow.genai.load_prompt(_fqn(CONTEXT_RETENTION_JUDGE_NAME)).template
+    return mlflow.genai.load_prompt(_prompt_uri(CONTEXT_RETENTION_JUDGE_NAME)).template
 
 
 def get_search_quality_judge_instructions() -> str:
-    return mlflow.genai.load_prompt(_fqn(SEARCH_QUALITY_JUDGE_NAME)).template
+    return mlflow.genai.load_prompt(_prompt_uri(SEARCH_QUALITY_JUDGE_NAME)).template
