@@ -24,6 +24,7 @@ from devconnect.config import AgentConfig
 from devconnect.providers import get_client
 from devconnect.restaurant_research_bot.search_tool import web_search, WEB_SEARCH_TOOL_SCHEMA
 from devconnect.restaurant_research_bot.prompts import (
+    configure_prompt_registry,
     register_all_prompts,
     get_system_prompt,
     get_coherence_judge_instructions,
@@ -79,6 +80,10 @@ class RestaurantResearchAgent:
         initialisation separate from the OpenAI SDK. Explicitly set the API key
         so litellm can reach the OpenAI endpoint.
         """
+        configure_prompt_registry(
+            catalog=self.config.prompt_catalog,
+            schema=self.config.prompt_schema,
+        )
         register_all_prompts()
         litellm.api_key = os.environ.get("OPENAI_API_KEY", "")
         self.coherence_judge = make_judge(

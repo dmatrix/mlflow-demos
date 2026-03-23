@@ -14,6 +14,8 @@ CONTEXT_RETENTION_JUDGE_NAME judge_context_retention
 SEARCH_QUALITY_JUDGE_NAME    judge_search_quality
 """
 
+from typing import Optional
+
 import mlflow
 
 # ---------------------------------------------------------------------------
@@ -106,41 +108,59 @@ Rationale: Cite specific turns where search use was appropriate or not.
 """
 
 # ---------------------------------------------------------------------------
-# Registration (idempotent)
+# Unity Catalog prompt registry configuration
 # ---------------------------------------------------------------------------
 
-def _register_if_missing(name: str, template: str, commit_message: str) -> None:
-    """Register a prompt only if it does not already exist in the registry."""
-    if mlflow.genai.load_prompt(name, allow_missing=True) is None:
-        mlflow.genai.register_prompt(name, template, commit_message=commit_message)
+_uc_prefix: Optional[str] = None  # e.g. "catalog.schema"
 
+
+def configure_prompt_registry(
+    catalog: Optional[str] = None, schema: Optional[str] = None
+) -> None:
+    """Call once before register/load to use Unity Catalog FQN prompt names."""
+    global _uc_prefix
+    if catalog and schema:
+        _uc_prefix = f"{catalog}.{schema}"
+    else:
+        _uc_prefix = None
+
+
+def _fqn(base_name: str) -> str:
+    """Return 'catalog.schema.base_name' if UC is configured, else bare name."""
+    return f"{_uc_prefix}.{base_name}" if _uc_prefix else base_name
+
+
+# ---------------------------------------------------------------------------
+# Registration
+# ---------------------------------------------------------------------------
 
 def register_all_prompts() -> None:
     """
     Register all four prompts in the MLflow Prompt Registry.
 
-    Safe to call multiple times — each prompt is only registered on the first
-    call. Subsequent calls are no-ops (the registry copy is not overwritten).
+    Always creates a new version if the prompt already exists.
+    When Unity Catalog is configured via configure_prompt_registry(),
+    prompts are registered with fully qualified names (catalog.schema.name).
     """
-    _register_if_missing(
-        SYSTEM_PROMPT_NAME,
+    mlflow.genai.register_prompt(
+        _fqn(SYSTEM_PROMPT_NAME),
         _SYSTEM_PROMPT_TEMPLATE,
-        "Agent system prompt with search query construction guidance",
+        commit_message="Agent system prompt with search query construction guidance",
     )
-    _register_if_missing(
-        COHERENCE_JUDGE_NAME,
+    mlflow.genai.register_prompt(
+        _fqn(COHERENCE_JUDGE_NAME),
         _COHERENCE_TEMPLATE,
-        "Session-level judge: conversation coherence (bool)",
+        commit_message="Session-level judge: conversation coherence (bool)",
     )
-    _register_if_missing(
-        CONTEXT_RETENTION_JUDGE_NAME,
+    mlflow.genai.register_prompt(
+        _fqn(CONTEXT_RETENTION_JUDGE_NAME),
         _CONTEXT_RETENTION_TEMPLATE,
-        "Session-level judge: context retention (excellent/good/fair/poor)",
+        commit_message="Session-level judge: context retention (excellent/good/fair/poor)",
     )
-    _register_if_missing(
-        SEARCH_QUALITY_JUDGE_NAME,
+    mlflow.genai.register_prompt(
+        _fqn(SEARCH_QUALITY_JUDGE_NAME),
         _SEARCH_QUALITY_TEMPLATE,
-        "Session-level judge: search quality (necessary/unnecessary/skipped)",
+        commit_message="Session-level judge: search quality (necessary/unnecessary/skipped)",
     )
 
 
@@ -149,16 +169,16 @@ def register_all_prompts() -> None:
 # ---------------------------------------------------------------------------
 
 def get_system_prompt() -> str:
-    return mlflow.genai.load_prompt(SYSTEM_PROMPT_NAME).template
+    return mlflow.genai.load_prompt(_fqn(SYSTEM_PROMPT_NAME)).template
 
 
 def get_coherence_judge_instructions() -> str:
-    return mlflow.genai.load_prompt(COHERENCE_JUDGE_NAME).template
+    return mlflow.genai.load_prompt(_fqn(COHERENCE_JUDGE_NAME)).template
 
 
 def get_context_retention_judge_instructions() -> str:
-    return mlflow.genai.load_prompt(CONTEXT_RETENTION_JUDGE_NAME).template
+    return mlflow.genai.load_prompt(_fqn(CONTEXT_RETENTION_JUDGE_NAME)).template
 
 
 def get_search_quality_judge_instructions() -> str:
-    return mlflow.genai.load_prompt(SEARCH_QUALITY_JUDGE_NAME).template
+    return mlflow.genai.load_prompt(_fqn(SEARCH_QUALITY_JUDGE_NAME)).template
