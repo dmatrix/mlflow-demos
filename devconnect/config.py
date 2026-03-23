@@ -16,6 +16,8 @@ class AgentConfig:
     api_key: Optional[str] = None
     databricks_host: Optional[str] = None
     databricks_token: Optional[str] = None
+    prompt_catalog: Optional[str] = None
+    prompt_schema: Optional[str] = None
 
     def __post_init__(self):
         if self.provider == "databricks":
