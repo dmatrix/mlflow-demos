@@ -24,6 +24,12 @@ variables:
     description: SQL Warehouse ID (for Genie Space)
 
 resources:
+  apps:
+    fema_supervisor_app:
+      name: fema-supervisor-app
+      description: "FEMA Disaster Response Supervisor — Streamlit UI"
+      source_code_path: .
+
   jobs:
     setup_demo:
       name: fema-multi-agent-setup

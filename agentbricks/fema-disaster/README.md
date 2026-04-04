@@ -62,25 +62,52 @@ After the job completes:
 5. Add instructions (printed at the end of the `create_agents` task output)
 6. Copy the **endpoint name** from "See Agent status"
 
-### 5. Test and evaluate (standalone notebooks)
+### 5. Launch the Streamlit App (Databricks App)
+
+The app provides an interactive GUI for querying the Supervisor — select predefined questions or ask your own.
+
+**Deploy and run as a Databricks App:**
+
+```bash
+databricks bundle deploy -t dev --var="warehouse_id=<your-warehouse-id>"
+databricks apps deploy fema-supervisor-app --source-code-path .
+```
+
+**Or run locally for development:**
+
+```bash
+export DATABRICKS_HOST=https://<your-workspace>.cloud.databricks.com
+export DATABRICKS_TOKEN=<your-token>
+export SUPERVISOR_ENDPOINT=<your-endpoint-name>
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+### 6. Test and evaluate (standalone notebooks)
 
 The query and evaluation notebooks are not part of the automated job — they require the Supervisor endpoint to exist first. Run them interactively after setting `supervisor_endpoint`:
 
-- `src/04_query_supervisor.py` — 6 test queries across all routing paths
-- `src/05_evaluate.py` — MLflow GenAI evaluation + individual judge assessments
+- `src/query_supervisor.py` — 6 test queries across all routing paths
+- `src/evaluate_agents.py` — MLflow GenAI evaluation + individual judge assessments
 
 ## File Structure
 
 ```
 fema-disaster/
-├── databricks.yml          # Bundle config: 2-task job, variables, serverless
+├── app.py                  # Streamlit app entry point
+├── app.yaml                # Databricks App manifest
+├── requirements.txt        # Streamlit app dependencies
+├── databricks.yml          # Bundle config: app + 2-task job, variables, serverless
+├── images/
+│   └── fema_multi_agent_supervisor.svg  # Architecture diagram
 ├── src/
-│   ├── load_fema_data.py   # Library: generates FEMA disaster data
-│   ├── setup_agents.py     # Library: Genie, Vector Search, KA creation
-│   ├── load_data.py        # Notebook (task 1): loads data into UC
-│   ├── create_agents.py    # Notebook (task 2): creates all agents
-│   ├── 04_query_supervisor.py  # Standalone: test queries
-│   └── 05_evaluate.py         # Standalone: MLflow evaluation
+│   ├── load_fema_data.py       # Library: generates FEMA disaster data
+│   ├── setup_agents.py         # Library: Genie, Vector Search, KA creation
+│   ├── supervisor_client.py    # Library: query_supervisor() for Streamlit app
+│   ├── load_data.py            # Notebook (task 1): loads data into UC
+│   ├── create_agents.py        # Notebook (task 2): creates all agents
+│   ├── query_supervisor.py     # Standalone: test queries
+│   └── evaluate_agents.py      # Standalone: MLflow evaluation
 ├── README.md
 └── .gitignore
 ```

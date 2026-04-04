@@ -1,0 +1,12 @@
+command:
+  - "streamlit"
+  - "run"
+  - "app.py"
+  - "--server.port"
+  - "8501"
+  - "--server.address"
+  - "0.0.0.0"
+
+env:
+  - name: SUPERVISOR_ENDPOINT
+    description: "Name of the AgentBricks Supervisor serving endpoint"

@@ -20,7 +20,6 @@ import uuid
 try:
     from databricks.sdk import WorkspaceClient
     from databricks.sdk.service.knowledgeassistants import (
-        FilesSpec,
         KnowledgeAssistant,
         KnowledgeSource,
         IndexSpec,
@@ -154,7 +153,7 @@ def create_genie_space(
 
     Returns the Genie Space ID.
     """
-    print(f"\nCreating Genie Space: FEMA Disaster Data")
+    print("\nCreating Genie Space: FEMA Disaster Data")
     _require_sdk_capability(
         w,
         "genie",
@@ -207,7 +206,7 @@ def create_vector_search(
         ep = vsc.get_endpoint(vs_endpoint_name)
         status = ep.get("endpoint_status", {}).get("state", "UNKNOWN")
         if status == "ONLINE":
-            print(f"  Endpoint is ONLINE")
+            print("  Endpoint is ONLINE")
             break
         time.sleep(10)
         if i % 6 == 0:
@@ -216,10 +215,16 @@ def create_vector_search(
         print(f"  Endpoint status: {status} -- may still be provisioning.")
 
     # --- Delta Sync Index ---
+    # Try to delete any pre-existing index on this endpoint.
     try:
         vsc.get_index(vs_endpoint_name, vs_index_name)
-        print(f"\nVector Search index already exists: {vs_index_name}")
+        print(f"\nVector Search index already exists: {vs_index_name} — deleting and recreating...")
+        vsc.delete_index(vs_endpoint_name, vs_index_name)
+        time.sleep(5)
     except Exception:
+        pass
+
+    try:
         print(f"\nCreating Delta Sync Index: {vs_index_name}...")
         vsc.create_delta_sync_index(
             endpoint_name=vs_endpoint_name,
@@ -233,21 +238,48 @@ def create_vector_search(
         )
         print(f"  Embedding model: {embedding_model}")
         print(f"  Source table: {fq_policy_table}")
+    except Exception as e:
+        if "already exists" in str(e):
+            # The index exists but is bound to a different (possibly deleted) endpoint.
+            # Delete the orphaned index via the SDK and retry.
+            print(f"\nOrphaned index detected: {vs_index_name} — deleting stale reference...")
+            try:
+                from databricks.sdk import WorkspaceClient
+                _w = WorkspaceClient()
+                _w.api_client.do("DELETE", f"/api/2.0/vector-search/indexes/{vs_index_name}")
+            except Exception:
+                vsc.delete_index(vs_endpoint_name, vs_index_name)
+            time.sleep(5)
+            print(f"Creating Delta Sync Index (retry): {vs_index_name}...")
+            vsc.create_delta_sync_index(
+                endpoint_name=vs_endpoint_name,
+                source_table_name=fq_policy_table,
+                index_name=vs_index_name,
+                pipeline_type="TRIGGERED",
+                primary_key="doc_id",
+                embedding_source_column="text",
+                embedding_model_endpoint_name=embedding_model,
+                columns_to_sync=["doc_id", "doc_uri", "text"],
+            )
+            print(f"  Embedding model: {embedding_model}")
+            print(f"  Source table: {fq_policy_table}")
+        else:
+            raise
 
     print("\nWaiting for index sync to complete...")
     for i in range(60):
         try:
             idx = vsc.get_index(vs_endpoint_name, vs_index_name)
             if idx.describe().get("status", {}).get("ready", False):
-                print(f"  Index is READY")
+                print("  Index is READY")
                 break
         except Exception:
             pass
         time.sleep(10)
         if i % 6 == 0:
-            print(f"  Syncing... (waiting)")
+            print("  Syncing... (waiting)")
     else:
-        print(f"  Index may still be syncing. Check status in the UI.")
+        print("  Index may still be syncing. Check status in the UI.")
 
     # --- Verify ---
     try:
@@ -344,26 +376,37 @@ def create_knowledge_assistant(
     existing_source = _get_existing_knowledge_source(w, assistant_name, vs_index_name)
 
     if existing_source is None:
-        source = w.knowledge_assistants.create_knowledge_source(
-            parent=assistant_name,
-            knowledge_source=KnowledgeSource(
-                display_name=KA_SOURCE_NAME,
-                description="7 FEMA policy documents indexed via Delta Sync",
-                source_type="index",
-                index=IndexSpec(
-                    index_name=vs_index_name,
-                    text_col="text",
-                    doc_uri_col="doc_uri",
+        try:
+            source = w.knowledge_assistants.create_knowledge_source(
+                parent=assistant_name,
+                knowledge_source=KnowledgeSource(
+                    display_name=KA_SOURCE_NAME,
+                    description="7 FEMA policy documents indexed via Delta Sync",
+                    source_type="index",
+                    index=IndexSpec(
+                        index_name=vs_index_name,
+                        text_col="text",
+                        doc_uri_col="doc_uri",
+                    ),
                 ),
-            ),
-        )
-        print(f"  Knowledge source attached: {source.name}")
+            )
+            print(f"  Knowledge source attached: {source.name}")
+        except Exception as e:
+            if "NOT_FOUND" in str(e):
+                raise RuntimeError(
+                    f"Vector Search index '{vs_index_name}' or its endpoint was not found. "
+                    f"The index may reference a deleted endpoint. Delete the orphaned index "
+                    f"and rerun setup:\n"
+                    f"  databricks vector-search-indexes delete-index \"{vs_index_name}\"\n"
+                    f"Original error: {e}"
+                ) from e
+            raise
     else:
         print(f"  Knowledge source already exists: {existing_source.name}")
 
-    print(f"  Syncing knowledge sources...")
+    print("  Syncing knowledge sources...")
     w.knowledge_assistants.sync_knowledge_sources(name=assistant_name)
-    print(f"  Sync triggered")
+    print("  Sync triggered")
 
     return assistant_name
 
