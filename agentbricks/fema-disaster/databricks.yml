@@ -1,0 +1,70 @@
+bundle:
+  name: fema-multi-agent
+
+variables:
+  catalog:
+    description: Unity Catalog catalog name
+    default: jules_catalog
+  schema:
+    description: Schema for FEMA demo tables
+    default: fema_demo
+  table_name:
+    description: FEMA disaster data table name
+    default: disaster_data
+  policy_table_name:
+    description: Policy documents table name
+    default: policy_docs
+  vs_endpoint_name:
+    description: Vector Search endpoint name
+    default: fema_vs_endpoint
+  embedding_model:
+    description: Embedding model for Vector Search
+    default: databricks-gte-large-en
+  warehouse_id:
+    description: SQL Warehouse ID (for Genie Space)
+
+resources:
+  jobs:
+    setup_demo:
+      name: fema-multi-agent-setup
+      tasks:
+        - task_key: load_data
+          notebook_task:
+            notebook_path: ./src/load_data.py
+            source: WORKSPACE
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              table_name: ${var.table_name}
+              policy_table_name: ${var.policy_table_name}
+          environment_key: default
+        - task_key: create_agents
+          depends_on:
+            - task_key: load_data
+          notebook_task:
+            notebook_path: ./src/create_agents.py
+            source: WORKSPACE
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              table_name: ${var.table_name}
+              policy_table_name: ${var.policy_table_name}
+              vs_endpoint_name: ${var.vs_endpoint_name}
+              embedding_model: ${var.embedding_model}
+              warehouse_id: ${var.warehouse_id}
+          environment_key: default
+      environments:
+        - environment_key: default
+          spec:
+            client: "1"
+            dependencies:
+              - databricks-sdk>=0.44.0
+              - databricks-vectorsearch
+              - databricks-agents
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://e2-dogfood.staging.cloud.databricks.com
