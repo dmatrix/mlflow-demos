@@ -10,6 +10,12 @@ Demo agents and notebooks showcasing [MLflow](https://mlflow.org) GenAI evaluati
 
 ## What's Here
 
+### `agentbricks/fema-disaster`
+
+A **Databricks Asset Bundle** that deploys a multi-agent supervisor for FEMA disaster response using 100% Databricks-native components. A Supervisor Agent routes queries to a **Genie Space** (structured data: disaster counts, federal aid, severity trends) and a **Knowledge Assistant** (policy retrieval: evacuation protocols, aid eligibility, safety guidelines) backed by Vector Search. Includes MLflow GenAI evaluation with built-in scorers and individual judge assessments.
+
+Deploys to serverless compute with two `databricks bundle` commands. See the [full README](agentbricks/fema-disaster/README.md) for setup instructions.
+
 ### `devconnect/restaurant_research_bot`
 
 A multi-turn conversational agent that researches restaurants using live web search, evaluated with MLflow session-level judges.
