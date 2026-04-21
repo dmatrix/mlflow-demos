@@ -4,7 +4,6 @@ Adapted from src/04_query_supervisor.py to work outside Databricks notebook
 context — uses WorkspaceClient for auth (OAuth in Databricks Apps, env vars locally).
 """
 
-import os
 import requests
 from databricks.sdk import WorkspaceClient
 
@@ -21,10 +20,10 @@ def query_supervisor(client: WorkspaceClient, endpoint_name: str, query: str) ->
         {"answer": str, "raw_response": dict}
     """
     host = client.config.host.rstrip("/")
-    headers = {
-        "Authorization": f"Bearer {client.config.token}",
-        "Content-Type": "application/json",
-    }
+    headers = {"Content-Type": "application/json"}
+    # Use the SDK's credential provider to get an auth header
+    for k, v in client.config.authenticate().items():
+        headers[k] = v
 
     response = requests.post(
         f"{host}/serving-endpoints/{endpoint_name}/invocations",
