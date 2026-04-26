@@ -6,7 +6,7 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-compatible-412991?logo=openai&logoColor=white)](https://openai.com)
 [![Tavily](https://img.shields.io/badge/Tavily-web%20search-00B4D8)](https://tavily.com)
 
-Demo agents and notebooks showcasing [MLflow](https://mlflow.org) GenAI evaluation capabilities, built for DevConnect.
+Demo agents and notebooks showcasing [MLflow](https://mlflow.org) GenAI evaluation capabilities, built for DevConnect and AI Conferences
 
 ## What's Here
 
