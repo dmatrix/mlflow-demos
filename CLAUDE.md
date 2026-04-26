@@ -2,7 +2,7 @@
 
 ## Project overview
 
-Demo agents and notebooks showcasing MLflow GenAI evaluation. The primary demo is a multi-turn restaurant research agent (`devconnect/resturant_research_bot`) that uses web search via Tavily and is evaluated with MLflow session-level judges.
+Demo agents and notebooks showcasing MLflow GenAI evaluation and Databricks governance capabilities. Contains two main demos: a multi-turn restaurant research agent (`devconnect/resturant_research_bot`) evaluated with MLflow session-level judges, and an AI Gateway governance demo (`ai_gateway_governance/`) showing centralized guardrails for coding agents.
 
 ## Layout
 
@@ -18,6 +18,16 @@ devconnect/
     scenarios.py                     # get_scenario_*() functions
     prompts.py                       # system prompt + three judge instruction strings
     search_tool.py                   # Tavily web_search() tool wrapper
+
+ai_gateway_governance/
+  ai_gateway_demo.ipynb            # Main demo notebook (4 acts)
+  gateway_config.py                # GatewayConfig dataclass + SDK helpers for AI Gateway
+  agent_simulator.py               # SimulatedAgent, GatewayClient, request handling with retry
+  scenarios.py                     # Test payloads: clean requests, PII, prompt injection
+  prompts.py                       # System prompts for each coding agent persona
+  observability.py                 # SQL query templates for inference tables
+  images/
+    ai_gateway_architecture.svg    # Architecture diagram
 ```
 
 ## Running the demo

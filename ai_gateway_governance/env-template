@@ -1,0 +1,14 @@
+# Unity AI Gateway Governance Demo
+# Copy this file to .env and fill in your values.
+
+# Databricks workspace
+DATABRICKS_HOST=https://<workspace>.cloud.databricks.com
+DATABRICKS_TOKEN=dapi...
+
+# AI Gateway endpoint (must already exist and serve a foundation model)
+AI_GATEWAY_ENDPOINT_NAME=coding-agent-gateway
+AI_GATEWAY_MODEL=databricks-claude-sonnet-4
+
+# Unity Catalog location for inference tables
+UC_CATALOG=jules_catalog
+UC_SCHEMA=ai_gateway_demo

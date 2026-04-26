@@ -36,6 +36,17 @@ The agent is evaluated along **three dimensions** using MLflow session-level jud
 | `context_retention` | Does the agent remember prior constraints (allergies, location, preferences)? |
 | `search_quality` | Did the agent search when needed and skip when it wasn't? |
 
+### `ai_gateway_governance/`
+
+A notebook-driven demo showing how [Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway) provides centralized governance for coding agents. Simulates four agents (Cursor, Claude Code, Codex CLI, Gemini CLI) sending requests through a single gateway endpoint and demonstrates:
+
+* **PII detection** — blocks requests containing SSNs, credit cards, etc.
+* **Safety filters** — blocks prompt injection and harmful content
+* **Inference tables** — all requests (including blocked) logged to Delta in Unity Catalog
+* **Usage tracking** — unified cost and token tracking across agents
+
+Requires a Databricks workspace with a serving endpoint and Unity Catalog. See the [full README](ai_gateway_governance/README.md) for setup instructions.
+
 ## Quickstart
 
 ### Prerequisites
