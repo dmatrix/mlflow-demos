@@ -76,16 +76,11 @@ Then fill in your values:
 OPENAI_API_KEY=sk-...
 TAVILY_API_KEY=tvly-...
 OPENAI_API_BASE=https://api.openai.com/v1
+MLFLOW_TRACKING_URI=http://localhost:5000
 
-# Databricks host and token (only if running from local host)
+# Databricks (only if using --provider databricks)
 DATABRICKS_HOST=https://<your-workspace>.cloud.databricks.com
 DATABRICKS_TOKEN=dapi...
-
-#
-AI_GATEWAY_ENDPOINT_NAME=<ai-gateway-endpoint-name>
-AI_GATEWAY_MODEL="databricks-model-name"
-UC_CATALOG="your_catalog_name"
-UC_SCHEMA="your_schema_name"
 ```
 
 ### Run the CLI
