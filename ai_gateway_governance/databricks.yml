@@ -1,0 +1,18 @@
+# Declarative Automation Bundle configuration for the AI Gateway Governance demo.
+#
+# Deploys the project to a Databricks workspace. Open ai_gateway_demo
+# in the workspace and run Acts 1-4 interactively.
+#
+# Usage:
+#   databricks bundle validate
+#   databricks bundle deploy
+
+bundle:
+  name: ai-gateway-governance
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://e2-dogfood.staging.cloud.databricks.com

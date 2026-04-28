@@ -23,9 +23,9 @@ class GatewayClient:
     token: str
 
 
-def create_gateway_client(host: str, token: str, endpoint_name: str) -> GatewayClient:
-    """Create a client pointing at the AI Gateway /invocations endpoint."""
-    url = f"{host.rstrip('/')}/serving-endpoints/{endpoint_name}/invocations"
+def create_gateway_client(host: str, token: str) -> GatewayClient:
+    """Create a client pointing at the v2 Unity AI Gateway."""
+    url = f"{host.rstrip('/')}/ai-gateway/mlflow/v1/chat/completions"
     return GatewayClient(url=url, token=token)
 
 
@@ -47,7 +47,7 @@ def send_request(
             resp = requests.post(
                 client.url,
                 headers={"Authorization": f"Bearer {client.token}"},
-                json={"messages": full_messages, "max_tokens": 1024},
+                json={"model": model, "messages": full_messages, "max_tokens": 1024},
                 timeout=120,
             )
 
