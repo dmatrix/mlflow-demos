@@ -1,6 +1,6 @@
 # Governing Coding Agent Sprawl with Unity AI Gateway
 
-![AI Gateway Architecture](./images/ai_gateway_architecture.svg)
+![AI Gateway Architecture](./images/ai_gateway_architecture.png)
 
 **The problem:** Your organization has dozens of developers using Cursor, Claude Code, Codex CLI, and Gemini CLI. Each agent calls a different LLM provider with its own API key. You have no visibility into who is spending what, no guardrails against data leaks, and no audit trail.
 
@@ -29,47 +29,76 @@ The notebook walks through four acts:
 - An existing serving endpoint backed by a foundation model (e.g., `databricks-gpt-5-4`, `databricks-claude-sonnet-4`)
 - `CAN_MANAGE` permission on the serving endpoint (to configure AI Gateway)
 - `CREATE TABLE` permission on the target catalog/schema (for inference tables)
-- Databricks personal access token
+- Databricks personal access token (for local runs)
 
-## Setup
+## Running locally
 
-```bash
-# From the mlflow-demos root
-cp ai_gateway_governance/env-template ai_gateway_governance/.env
-# Edit .env with your values (see env-template for required variables)
+1. Create a `.env` file from the template and fill in your values:
 
-uv sync
-```
+    ```bash
+    cd ai_gateway_governance
+    cp env-template .env
+    ```
 
-### Environment variables
+    | Variable | Description |
+    |----------|-------------|
+    | `DATABRICKS_HOST` | Workspace URL (e.g., `https://<workspace>.cloud.databricks.com`) |
+    | `DATABRICKS_TOKEN` | Personal access token |
+    | `AI_GATEWAY_ENDPOINT_NAME` | Name of your serving endpoint |
+    | `AI_GATEWAY_MODEL` | Foundation model name (e.g., `databricks-gpt-5-4`) |
+    | `UC_CATALOG` | Unity Catalog catalog for inference tables |
+    | `UC_SCHEMA` | Unity Catalog schema for inference tables |
 
-| Variable | Description |
-|----------|-------------|
-| `DATABRICKS_HOST` | Workspace URL (e.g., `https://<workspace>.cloud.databricks.com`) |
-| `DATABRICKS_TOKEN` | Personal access token |
-| `AI_GATEWAY_ENDPOINT_NAME` | Name of your serving endpoint |
-| `AI_GATEWAY_MODEL` | Foundation model name (e.g., `databricks-gpt-5-4`) |
-| `UC_CATALOG` | Unity Catalog catalog for inference tables |
-| `UC_SCHEMA` | Unity Catalog schema for inference tables |
+2. Install dependencies and launch the notebook:
 
-## Running
+    ```bash
+    uv sync
+    jupyter notebook ai_gateway_demo.ipynb
+    ```
 
-**On Databricks:** Upload the notebook and all `.py` modules to a Databricks workspace. The notebook uses `spark` and `display()` for querying inference tables in Act 4.
+3. Run Acts 1–3 interactively. Act 4 (inference table queries) requires a Databricks runtime — the notebook prints the raw SQL instead when running locally.
 
-**Locally:** Run the notebook with Jupyter. Acts 1–3 work locally. The observability cells (Act 4) require a Databricks notebook runtime for `spark` — skip them when running locally.
+## Deploying to Databricks
+
+This project uses [Declarative Automation Bundles](https://docs.databricks.com/en/dev-tools/bundles/index.html) to deploy the notebook and all supporting modules to a Databricks workspace.
+
+1. Install the Databricks CLI (if not already installed):
+
+    ```bash
+    brew install databricks/tap/databricks
+    ```
+
+2. Authenticate with your workspace:
+
+    ```bash
+    databricks auth login --host https://<your-workspace>.cloud.databricks.com
+    ```
+
+3. Validate and deploy:
+
+    ```bash
+    cd ai_gateway_governance
+    databricks bundle validate
+    databricks bundle deploy
+    ```
+
+4. Open `ai_gateway_demo` in your Databricks workspace and run Acts 1–4 interactively. The notebook auto-detects the Databricks runtime and fetches host/token via `dbutils` — no `.env` file needed.
+
+> **Tip:** Update `databricks.yml` to change the target workspace or add additional targets (e.g., staging, production).
 
 ## File structure
 
 ```
 ai_gateway_governance/
-├── ai_gateway_demo.ipynb   # Main demo notebook
+├── databricks.yml          # Declarative Automation Bundle configuration
+├── ai_gateway_demo.ipynb   # Demo notebook (runs locally and on Databricks)
 ├── gateway_config.py       # GatewayConfig dataclass + SDK helpers for AI Gateway setup
 ├── agent_simulator.py      # SimulatedAgent, GatewayClient, request handling with retry
 ├── scenarios.py            # Test payloads: clean requests, PII, prompt injection
 ├── prompts.py              # System prompts for each coding agent persona
 ├── observability.py        # SQL query templates for inference tables
 ├── images/
-│   └── ai_gateway_architecture.svg
-├── env-template            # Environment variable template
+│   └── ai_gateway_architecture.png
+├── env-template            # Environment variable template (local use)
 └── README.md
 ```
