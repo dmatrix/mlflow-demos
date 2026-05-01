@@ -23,6 +23,7 @@ The notebook walks through five acts:
 3. **Act 3 — Guardrails in Action** — PII (SSNs, credit cards), prompt injection, and unsafe content attempts are blocked in real time with HTTP 400 responses
 4. **Act 4 — The Audit Trail** — Use Databricks Genie to explore the inference table in plain English: all requests, blocked requests, guardrail outcomes — no SQL required
 5. **Act 5 — Usage Tracking** — Query token consumption and latency breakdowns (allowed vs. blocked) and hourly endpoint usage via Genie natural language questions
+6. **Act 6 — Rate Limiting** — A 25-request burst test demonstrates QPM/TPM enforcement: early requests pass (HTTP 200), later ones are rejected (HTTP 429) without retry
 
 ## Prerequisites
 
@@ -47,6 +48,8 @@ Before running the notebook, set up your AI Gateway endpoint in the Databricks w
 5. **Enable inference tables** — under **Inference Tables**, turn on logging and point it at your Unity Catalog destination (`CATALOG.SCHEMA`). This powers the audit trail in Act 4 and the cost queries in Act 5.
 
 6. **Enable usage tracking** — turn on **Usage Tracking** to capture per-request token counts.
+
+7. **Configure rate limits** — under **Rate Limits**, set QPM and/or TPM limits for your user. This powers the burst test in Act 6. Skip if you want all requests to pass through.
 
 Once the endpoint is configured, copy the endpoint name into the `ENDPOINT_NAME` variable in the notebook's config cell.
 
