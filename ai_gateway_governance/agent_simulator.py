@@ -62,7 +62,7 @@ def send_request(
                     "status": resp.status_code,
                     "content": None,
                     "tokens": None,
-                    "error": resp.text[:300],
+                    "error": resp.text[:1000],
                 }
 
             data = resp.json()
@@ -105,6 +105,78 @@ def run_scenario(
     result["actual_outcome"] = actual
     result["pass"] = actual == scenario["expected_outcome"]
     return result
+
+
+def send_burst_request(
+    client: GatewayClient,
+    agent: SimulatedAgent,
+    messages: list[dict],
+    model: str,
+) -> dict:
+    """Send a single request without retrying on 429 — exposes rate limit enforcement."""
+    payload = {
+        "model": model,
+        "messages": [{"role": "system", "content": agent.system_prompt}] + messages,
+        "max_tokens": 256,
+    }
+    try:
+        resp = requests.post(
+            client.url,
+            headers={"Authorization": f"Bearer {client.token}"},
+            json=payload,
+            timeout=120,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            usage = data.get("usage", {})
+            return {
+                "status": 200,
+                "outcome": "allowed",
+                "content": data.get("choices", [{}])[0].get("message", {}).get("content", "")[:200],
+                "total_tokens": usage.get("total_tokens", 0),
+            }
+        return {
+            "status": resp.status_code,
+            "outcome": "rate_limited" if resp.status_code == 429 else "error",
+            "content": resp.text[:200],
+            "total_tokens": 0,
+        }
+    except Exception as e:
+        return {"status": 500, "outcome": "error", "content": str(e), "total_tokens": 0}
+
+
+def run_burst_test(
+    client: GatewayClient,
+    agent: SimulatedAgent,
+    scenario: dict,
+    model: str,
+    n_requests: int = 25,
+) -> list[dict]:
+    """Fire n_requests rapid sequential requests and return all results."""
+    results = []
+    for i in range(n_requests):
+        result = send_burst_request(client, agent, scenario["messages"], model)
+        result["request_num"] = i + 1
+        results.append(result)
+    return results
+
+
+def print_burst_summary(results: list[dict]) -> None:
+    """Print per-request outcomes then a pass/fail summary."""
+    for r in results:
+        icon = "+" if r["outcome"] == "allowed" else "x"
+        line = f"  [{icon}] Request {r['request_num']:>2}  HTTP {r['status']}  {r['outcome']}"
+        if r["outcome"] == "error":
+            line += f"  — {r['content']}"
+        print(line)
+    print()
+    allowed = sum(1 for r in results if r["outcome"] == "allowed")
+    rate_limited = sum(1 for r in results if r["outcome"] == "rate_limited")
+    errors = len(results) - allowed - rate_limited
+    print(f"  Allowed:       {allowed}/{len(results)}")
+    print(f"  Rate-limited:  {rate_limited}/{len(results)}")
+    if errors:
+        print(f"  Errors:        {errors}/{len(results)}")
 
 
 def print_result(result: dict) -> None:
