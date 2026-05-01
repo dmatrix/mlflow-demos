@@ -16,20 +16,48 @@
 
 ## What the demo covers
 
-The notebook walks through four acts:
+The notebook walks through five acts:
 
 1. **Act 1 — Configure the Gateway** — Programmatic setup of PII detection (BLOCK mode), safety filters, inference tables, and usage tracking via the Databricks SDK
 2. **Act 2 — Simulate the Coding Agent Swarm** — Four simulated coding agents (Cursor, Claude Code, Codex CLI, Gemini CLI) send legitimate coding requests through the same gateway endpoint
-3. **Act 3 — Guardrails in Action** — PII (SSNs, credit cards) and prompt injection attempts are blocked in real time with HTTP 400 responses
-4. **Act 4 — The Audit Trail** — Query inference tables in Delta showing all requests, including blocked ones, for compliance and cost tracking
+3. **Act 3 — Guardrails in Action** — PII (SSNs, credit cards), prompt injection, and unsafe content attempts are blocked in real time with HTTP 400 responses
+4. **Act 4 — The Audit Trail** — Use Databricks Genie to explore the inference table in plain English: all requests, blocked requests, guardrail outcomes — no SQL required
+5. **Act 5 — Usage Tracking** — Query token consumption and latency breakdowns (allowed vs. blocked) and hourly endpoint usage via Genie natural language questions
 
 ## Prerequisites
 
 - Databricks workspace with Unity Catalog enabled
-- An existing serving endpoint backed by a foundation model (e.g., `databricks-gpt-5-4`, `databricks-claude-sonnet-4`)
-- `CAN_MANAGE` permission on the serving endpoint (to configure AI Gateway)
-- `CREATE TABLE` permission on the target catalog/schema (for inference tables)
 - Databricks personal access token (for local runs)
+
+### Configure AI Gateway in the Databricks UI
+
+Before running the notebook, set up your AI Gateway endpoint in the Databricks workspace:
+
+1. **Create or select a AI Gateway** — Add a new **AI Gateway Endpoint** in your workspace and choose an existing foundation model endpoint (e.g., `databricks-gpt-5-4`, `databricks-claude-sonnet-4`) or create a new one.
+
+2. **Enable AI Gateway** — on the endpoint's detail page, open the **AI Gateway** tab and click **Enable**.
+
+3. **Select the model** — confirm the foundation model backing the endpoint. This becomes the `MODEL` variable in the notebook config cell.
+
+4. **Configure guardrails** — under **Guardrails**, enable the following:
+   - **PII Detection** — set mode to **Block** to reject requests containing SSNs, credit card numbers, and other sensitive data
+   - **Jailbreak and Prompt Injection** — enable to block DAN prompts and attempts to extract system instructions
+   - ** Unsafe Content ** -- enable to block Unsafe Content
+
+5. **Enable inference tables** — under **Inference Tables**, turn on logging and point it at your Unity Catalog destination (`CATALOG.SCHEMA`). This powers the audit trail in Act 4 and the cost queries in Act 5.
+
+6. **Enable usage tracking** — turn on **Usage Tracking** to capture per-request token counts.
+
+Once the endpoint is configured, copy the endpoint name into the `ENDPOINT_NAME` variable in the notebook's config cell.
+
+
+### Set up a Genie Space
+
+Before presenting Acts 4 and 5:
+
+1. In your Databricks workspace, open **Genie Spaces** and create a new space.
+2. Add `CATALOG.SCHEMA.{SCHEMA}_payload` as a data source — this is the inference table created in step 5 above (e.g. `jules_catalog.unity-ai-gateway-demo.unity-ai-gateway-demo_payload`).
+3. Keep the Genie space open during the demo. Acts 4 and 5 provide ready-made questions to paste directly into the space — no code execution is required.
 
 ## Running locally
 
@@ -56,7 +84,9 @@ The notebook walks through four acts:
     jupyter notebook ai_gateway_demo.ipynb
     ```
 
-3. Run Acts 1–3 interactively. Act 4 (inference table queries) requires a Databricks runtime — the notebook prints the raw SQL instead when running locally.
+3. Run Acts 1–3 interactively.
+
+   > **Acts 4 and 5 require a Databricks workspace.** They use Databricks Genie to query the inference tables — deploy the notebook to Databricks (see below) and open the Genie space alongside it to use the provided questions.
 
 ## Deploying to Databricks
 
@@ -94,7 +124,7 @@ ai_gateway_governance/
 ├── ai_gateway_demo.ipynb   # Demo notebook (runs locally and on Databricks)
 ├── gateway_config.py       # GatewayConfig dataclass + SDK helpers for AI Gateway setup
 ├── agent_simulator.py      # SimulatedAgent, GatewayClient, request handling with retry
-├── scenarios.py            # Test payloads: clean requests, PII, prompt injection
+├── scenarios.py            # Test payloads: clean requests, PII, prompt injection, unsafe content
 ├── prompts.py              # System prompts for each coding agent persona
 ├── observability.py        # SQL query templates for inference tables
 ├── images/
