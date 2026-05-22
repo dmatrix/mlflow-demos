@@ -2,7 +2,7 @@
 
 ![AI Gateway Architecture](./images/ai_gateway_architecture.png)
 
-**The problem:** Your organization has dozens of developers using Cursor, Claude Code, Codex CLI, and Gemini CLI. Each agent calls a different LLM provider with its own API key. You have no visibility into who is spending what, no guardrails against data leaks, and no audit trail.
+**The problem:** Your organization has dozens of developers using Cursor, Claude Code, Codex CLI, Gemini CLI, and Pi. Each agent calls a different LLM provider with its own API key. You have no visibility into who is spending what, no guardrails against data leaks, and no audit trail.
 
 **The solution:** Route every coding agent through a single Unity AI Gateway endpoint. This notebook demonstrates the three governance pillars:
 
@@ -19,7 +19,7 @@
 The notebook walks through five acts:
 
 1. **Act 1 — Configure the Gateway** — Programmatic setup of PII detection (BLOCK mode), safety filters, inference tables, and usage tracking via the Databricks SDK
-2. **Act 2 — Simulate the Coding Agent Swarm** — Four simulated coding agents (Cursor, Claude Code, Codex CLI, Gemini CLI) send legitimate coding requests through the same gateway endpoint
+2. **Act 2 — Simulate the Coding Agent Swarm** — Five simulated coding agents (Cursor, Claude Code, Codex CLI, Gemini CLI, Pi) send legitimate coding requests through the same gateway endpoint
 3. **Act 3 — Guardrails in Action** — PII (SSNs, credit cards), prompt injection, and unsafe content attempts are blocked in real time with HTTP 400 responses
 4. **Act 4 — The Audit Trail** — Use Databricks Genie to explore the inference table in plain English: all requests, blocked requests, guardrail outcomes — no SQL required
 5. **Act 5 — Usage Tracking** — Query token consumption and latency breakdowns (allowed vs. blocked) and hourly endpoint usage via Genie natural language questions
