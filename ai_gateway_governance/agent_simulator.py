@@ -15,6 +15,7 @@ class SimulatedAgent:
     name: str
     display_name: str
     system_prompt: str
+    model: str
 
 
 @dataclass
@@ -34,7 +35,6 @@ def send_request(
     client: GatewayClient,
     agent: SimulatedAgent,
     messages: list[dict],
-    model: str,
 ) -> dict:
     """Send a chat completion through the gateway and return a result dict."""
     full_messages = [{"role": "system", "content": agent.system_prompt}] + messages
@@ -47,7 +47,7 @@ def send_request(
             resp = requests.post(
                 client.url,
                 headers={"Authorization": f"Bearer {client.token}"},
-                json={"model": model, "messages": full_messages, "max_tokens": 1024},
+                json={"model": agent.model, "messages": full_messages, "max_tokens": 1024},
                 timeout=120,
             )
 
@@ -59,6 +59,7 @@ def send_request(
             if resp.status_code != 200:
                 return {
                     "agent": agent.display_name,
+                    "model": agent.model,
                     "status": resp.status_code,
                     "content": None,
                     "tokens": None,
@@ -69,6 +70,7 @@ def send_request(
             usage = data.get("usage", {})
             return {
                 "agent": agent.display_name,
+                "model": agent.model,
                 "status": 200,
                 "content": data["choices"][0]["message"]["content"],
                 "tokens": {
@@ -81,6 +83,7 @@ def send_request(
         except Exception as e:
             return {
                 "agent": agent.display_name,
+                "model": agent.model,
                 "status": 500,
                 "content": None,
                 "tokens": None,
@@ -92,10 +95,9 @@ def run_scenario(
     client: GatewayClient,
     agent: SimulatedAgent,
     scenario: dict,
-    model: str,
 ) -> dict:
     """Run a single scenario and return the result with scenario metadata."""
-    result = send_request(client, agent, scenario["messages"], model)
+    result = send_request(client, agent, scenario["messages"])
     result["scenario"] = scenario["name"]
     result["description"] = scenario["description"]
     result["expected_outcome"] = scenario["expected_outcome"]
@@ -111,11 +113,10 @@ def send_burst_request(
     client: GatewayClient,
     agent: SimulatedAgent,
     messages: list[dict],
-    model: str,
 ) -> dict:
     """Send a single request without retrying on 429 — exposes rate limit enforcement."""
     payload = {
-        "model": model,
+        "model": agent.model,
         "messages": [{"role": "system", "content": agent.system_prompt}] + messages,
         "max_tokens": 256,
     }
@@ -149,13 +150,12 @@ def run_burst_test(
     client: GatewayClient,
     agent: SimulatedAgent,
     scenario: dict,
-    model: str,
     n_requests: int = 25,
 ) -> list[dict]:
     """Fire n_requests rapid sequential requests and return all results."""
     results = []
     for i in range(n_requests):
-        result = send_burst_request(client, agent, scenario["messages"], model)
+        result = send_burst_request(client, agent, scenario["messages"])
         result["request_num"] = i + 1
         results.append(result)
     return results
@@ -187,6 +187,7 @@ def print_result(result: dict) -> None:
 
     print(f"  [{status_icon}] {result['description']}")
     print(f"    Agent:    {result['agent']}")
+    print(f"    Model:    {result['model']}")
     print(f"    Status:   {result['status']} ({outcome_icon})")
 
     if result["actual_outcome"] == "allowed" and result["tokens"]:
