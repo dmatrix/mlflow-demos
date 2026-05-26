@@ -12,7 +12,7 @@ import requests as http_requests
 @dataclass
 class GatewayConfig:
     endpoint_name: str
-    model: str
+    models: list[str]
     catalog_name: str
     schema_name: str
     table_name_prefix: str = "coding_agents"
@@ -26,13 +26,13 @@ class GatewayConfig:
     usage_tracking_enabled: bool = True
 
 
-def verify_gateway(host: str, token: str, model: str) -> dict:
+def verify_gateway(host: str, token: str, endpoint_name: str) -> dict:
     """Send a lightweight request to verify the v2 AI Gateway is reachable."""
     url = f"{host.rstrip('/')}/ai-gateway/mlflow/v1/chat/completions"
     resp = http_requests.post(
         url,
         headers={"Authorization": f"Bearer {token}"},
-        json={"model": model, "messages": [{"role": "user", "content": "Say ok"}], "max_tokens": 5},
+        json={"model": endpoint_name, "messages": [{"role": "user", "content": "Say ok"}], "max_tokens": 5},
         timeout=30,
     )
     return {"status": resp.status_code, "reachable": resp.status_code == 200}
@@ -50,6 +50,7 @@ def print_gateway_summary(config: GatewayConfig, host: str, token: str) -> None:
     print(f"\n  Gateway Status:   {status}")
     print(f"  Gateway URL:      {host.rstrip('/')}/ai-gateway/mlflow/v1/chat/completions")
     print(f"  Route:            {config.endpoint_name}")
+    print(f"  Models:           {', '.join(config.models)}")
 
     print(f"\n  Guardrails (configured via UI):")
     print(f"    PII:              {config.pii_behavior}")
