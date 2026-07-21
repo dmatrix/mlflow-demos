@@ -10,7 +10,7 @@
 |--------|--------------|
 | **Security & Audit** | Guardrails (PII detection, prompt injection, safety filters), all requests logged to Unity Catalog |
 | **Cost Management** | Rate limiting (QPM/TPM), unified billing, budget allocation per user/group |
-| **Observability** | Inference tables in Delta, per-user metrics, usage dashboards |
+| **Observability** | Inference tables in Delta, per-user metrics, usage dashboard, and MLflow tracing |
 
 > **Reference:** [Governing Coding Agent Sprawl with Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway)
 
