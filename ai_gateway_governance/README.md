@@ -43,7 +43,7 @@ Before running the notebook, set up your AI Gateway endpoint in the Databricks w
 4. **Configure guardrails** — under **Guardrails**, enable the following:
    - **PII Detection** — set mode to **Block** to reject requests containing SSNs, credit card numbers, and other sensitive data
    - **Jailbreak and Prompt Injection** — enable to block DAN prompts and attempts to extract system instructions
-   - ** Unsafe Content ** -- enable to block Unsafe Content
+   - **Unsafe Content** -- enable to block Unsafe Content
 
 5. **Enable inference tables** — under **Inference Tables**, turn on logging and point it at your Unity Catalog destination (`CATALOG.SCHEMA`). This powers the audit trail in Act 4 and the cost queries in Act 5.
 
