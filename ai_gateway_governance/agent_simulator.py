@@ -9,6 +9,10 @@ import requests
 MAX_RETRIES = 5
 INITIAL_BACKOFF = 2
 
+# Status codes worth retrying: 429 (rate limited) and 5xx (transient server /
+# guardrail-backend failures). Real guardrail blocks return 400 and are NOT retried.
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
 
 @dataclass
 class SimulatedAgent:
@@ -24,9 +28,14 @@ class GatewayClient:
     token: str
 
 
-def create_gateway_client(host: str, token: str) -> GatewayClient:
-    """Create a client pointing at the v2 Unity AI Gateway."""
-    url = f"{host.rstrip('/')}/ai-gateway/mlflow/v1/chat/completions"
+def create_gateway_client(host: str, token: str, endpoint_name: str) -> GatewayClient:
+    """Create a client pointing at a guarded serving endpoint's invocations URL.
+
+    Guardrails (PII/safety) are attached to the serving endpoint, so requests
+    must hit /serving-endpoints/<endpoint>/invocations to be enforced. The
+    endpoint fronts a single model, so the request body carries no `model` field.
+    """
+    url = f"{host.rstrip('/')}/serving-endpoints/{endpoint_name}/invocations"
     return GatewayClient(url=url, token=token)
 
 
@@ -47,11 +56,11 @@ def send_request(
             resp = requests.post(
                 client.url,
                 headers={"Authorization": f"Bearer {client.token}"},
-                json={"model": agent.model, "messages": full_messages, "max_tokens": 1024},
+                json={"messages": full_messages, "max_tokens": 1024},
                 timeout=120,
             )
 
-            if resp.status_code == 429 and attempt < MAX_RETRIES - 1:
+            if resp.status_code in RETRYABLE_STATUS and attempt < MAX_RETRIES - 1:
                 time.sleep(backoff)
                 backoff *= 2
                 continue
@@ -114,19 +123,34 @@ def send_burst_request(
     agent: SimulatedAgent,
     messages: list[dict],
 ) -> dict:
-    """Send a single request without retrying on 429 — exposes rate limit enforcement."""
+    """Send a single request, retrying only transient 5xx failures.
+
+    Deliberately does NOT retry 429 — surfacing rate-limit rejections is the
+    whole point of the burst test. But a transient guardrail-backend 5xx would
+    otherwise show up as spurious 'error' rows, so those are retried briefly.
+    """
     payload = {
-        "model": agent.model,
         "messages": [{"role": "system", "content": agent.system_prompt}] + messages,
         "max_tokens": 256,
     }
-    try:
-        resp = requests.post(
-            client.url,
-            headers={"Authorization": f"Bearer {client.token}"},
-            json=payload,
-            timeout=120,
-        )
+    backoff = INITIAL_BACKOFF
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.post(
+                client.url,
+                headers={"Authorization": f"Bearer {client.token}"},
+                json=payload,
+                timeout=120,
+            )
+        except Exception as e:
+            return {"status": 500, "outcome": "error", "content": str(e), "total_tokens": 0}
+
+        # Retry only transient server errors (not 429 — that's the signal we want).
+        if resp.status_code in {500, 502, 503, 504} and attempt < MAX_RETRIES - 1:
+            time.sleep(backoff)
+            backoff *= 2
+            continue
+
         if resp.status_code == 200:
             data = resp.json()
             usage = data.get("usage", {})
@@ -142,8 +166,6 @@ def send_burst_request(
             "content": resp.text[:200],
             "total_tokens": 0,
         }
-    except Exception as e:
-        return {"status": 500, "outcome": "error", "content": str(e), "total_tokens": 0}
 
 
 def run_burst_test(

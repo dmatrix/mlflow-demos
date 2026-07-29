@@ -5,7 +5,7 @@ description = "MLflow demo agents for DevConnect"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mlflow==3.11.1",
+    "mlflow==3.14.0",
     "openai>=1.0.0",
     "litellm<=1.82.5",
     "tavily-python>=0.3.0",
