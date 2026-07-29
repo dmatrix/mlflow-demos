@@ -11,6 +11,7 @@ Each scenario is a dict with:
 
 
 def get_pii_scenarios():
+    """PII scenarios."""
     return [
         {
             "name": "pii_ssn",
@@ -54,6 +55,7 @@ def get_pii_scenarios():
 
 
 def get_injection_scenarios():
+    """Injection scenarios."""
     return [
         {
             "name": "injection_jailbreak",
@@ -94,6 +96,7 @@ def get_injection_scenarios():
 
 
 def get_clean_scenarios():
+    """Clean scenarios."""
     return [
         {
             "name": "clean_refactor",

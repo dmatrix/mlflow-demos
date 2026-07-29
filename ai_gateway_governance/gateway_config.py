@@ -4,9 +4,16 @@ The v2 AI Gateway is configured through the Databricks UI. This module
 provides helpers to verify connectivity and display the expected config.
 """
 
+import time
 from dataclasses import dataclass, field
 
 import requests as http_requests
+
+# Retry transient rate-limit / server / guardrail-backend failures. A real
+# guardrail block is 400 and is never retried.
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+MAX_RETRIES = 5
+INITIAL_BACKOFF = 2
 
 
 @dataclass
@@ -27,14 +34,27 @@ class GatewayConfig:
 
 
 def verify_gateway(host: str, token: str, endpoint_name: str) -> dict:
-    """Send a lightweight request to verify the v2 AI Gateway is reachable."""
-    url = f"{host.rstrip('/')}/ai-gateway/mlflow/v1/chat/completions"
-    resp = http_requests.post(
-        url,
-        headers={"Authorization": f"Bearer {token}"},
-        json={"model": endpoint_name, "messages": [{"role": "user", "content": "Say ok"}], "max_tokens": 5},
-        timeout=30,
-    )
+    """Send a lightweight request to verify the guarded serving endpoint is reachable.
+
+    Guardrails are attached to the serving endpoint, so we hit its
+    /serving-endpoints/<endpoint>/invocations URL. The endpoint fronts a single
+    model, so the request body carries no `model` field.
+    """
+    url = f"{host.rstrip('/')}/serving-endpoints/{endpoint_name}/invocations"
+    backoff = INITIAL_BACKOFF
+    resp = None
+    for attempt in range(MAX_RETRIES):
+        resp = http_requests.post(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            json={"messages": [{"role": "user", "content": "Say ok"}], "max_tokens": 5},
+            timeout=30,
+        )
+        if resp.status_code in RETRYABLE_STATUS and attempt < MAX_RETRIES - 1:
+            time.sleep(backoff)
+            backoff *= 2
+            continue
+        break
     return {"status": resp.status_code, "reachable": resp.status_code == 200}
 
 
@@ -48,11 +68,11 @@ def print_gateway_summary(config: GatewayConfig, host: str, token: str) -> None:
 
     status = "CONNECTED" if result["reachable"] else f"ERROR (HTTP {result['status']})"
     print(f"\n  Gateway Status:   {status}")
-    print(f"  Gateway URL:      {host.rstrip('/')}/ai-gateway/mlflow/v1/chat/completions")
+    print(f"  Gateway URL:      {host.rstrip('/')}/serving-endpoints/{config.endpoint_name}/invocations")
     print(f"  Route:            {config.endpoint_name}")
     print(f"  Models:           {', '.join(config.models)}")
 
-    print(f"\n  Guardrails (configured via UI):")
+    print("\n  Guardrails (configured via UI):")
     print(f"    PII:              {config.pii_behavior}")
     print(f"    Safety:           {config.safety_enabled}")
     if config.invalid_keywords:
@@ -61,11 +81,11 @@ def print_gateway_summary(config: GatewayConfig, host: str, token: str) -> None:
         print(f"    Valid Topics:     {config.valid_topics}")
 
     if config.inference_table_enabled:
-        print(f"\n  Inference Tables:")
+        print("\n  Inference Tables:")
         print(f"    Enabled:  {config.inference_table_enabled}")
         print(f"    Location: {config.catalog_name}.{config.schema_name}.{config.table_name_prefix}*")
 
-    print(f"\n  Usage Tracking:")
+    print("\n  Usage Tracking:")
     print(f"    Enabled:  {config.usage_tracking_enabled}")
 
     print(f"\n{'=' * 60}")

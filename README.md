@@ -1,7 +1,7 @@
 # MLflow Demos
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![MLflow 3.10](https://img.shields.io/badge/mlflow-3.10-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org)
+[![MLflow 3.14](https://img.shields.io/badge/mlflow-3.10-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org)
 [![uv](https://img.shields.io/badge/uv-package%20manager-7C3AED?logo=uv&logoColor=white)](https://docs.astral.sh/uv/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-compatible-412991?logo=openai&logoColor=white)](https://openai.com)
 [![Tavily](https://img.shields.io/badge/Tavily-web%20search-00B4D8)](https://tavily.com)
@@ -38,12 +38,13 @@ The agent is evaluated along **three dimensions** using MLflow session-level jud
 
 ### `ai_gateway_governance/`
 
-A notebook-driven demo showing how [Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway) provides centralized governance for coding agents. Simulates four agents (Cursor, Claude Code, Codex CLI, Gemini CLI) sending requests through a single gateway endpoint and demonstrates:
+A notebook-driven demo showing how [Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway) provides centralized governance for coding agents. Simulates five agents (Cursor, Claude Code, Codex CLI, Gemini CLI, Pi) — each with its own persona system prompt — all routed through a **single guarded serving endpoint** (fronting one foundation model), and demonstrates:
 
-* **PII detection** — blocks requests containing SSNs, credit cards, etc.
-* **Safety filters** — blocks prompt injection and harmful content
-* **Inference tables** — all requests (including blocked) logged to Delta in Unity Catalog
+* **PII detection** — blocks requests containing SSNs, credit cards, etc. (HTTP 400)
+* **Safety & prompt-injection filters** — block jailbreaks and malware requests, with defense-in-depth: borderline unsafe content the gateway allows through is still refused by the model
+* **Inference tables** — all requests (including blocked) logged to Delta in Unity Catalog for audit and cost queries via Genie
 * **Usage tracking** — unified cost and token tracking across agents
+* **Rate limiting** — QPM (queries/min) and TPM (tokens/min) enforcement, returning HTTP 429 without hitting the model
 
 Requires a Databricks workspace with a serving endpoint and Unity Catalog. See the [full README](ai_gateway_governance/README.md) for setup instructions.
 
