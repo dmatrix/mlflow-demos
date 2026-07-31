@@ -74,7 +74,7 @@ Before presenting Acts 4 and 5:
 1. Create a `.env` file from the template and fill in your values:
 
     ```bash
-    cd ai_gateway_governance
+    cd unity_ai_gateway_governance
     cp env-template .env
     ```
 
@@ -117,7 +117,7 @@ This project uses [Declarative Automation Bundles](https://docs.databricks.com/e
 3. Validate and deploy:
 
     ```bash
-    cd ai_gateway_governance
+    cd unity_ai_gateway_governance
     databricks bundle validate
     databricks bundle deploy
     ```
@@ -129,7 +129,7 @@ This project uses [Declarative Automation Bundles](https://docs.databricks.com/e
 ## File structure
 
 ```
-ai_gateway_governance/
+unity_ai_gateway_governance/
 ├── databricks.yml          # Declarative Automation Bundle configuration
 ├── ai_gateway_demo.ipynb   # Demo notebook (runs locally and on Databricks)
 ├── gateway_config.py       # GatewayConfig dataclass + SDK helpers for AI Gateway setup
