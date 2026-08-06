@@ -23,12 +23,14 @@ The notebook walks through six acts:
 3. **Act 3 — Guardrails in Action** — PII (SSNs, credit cards, emails/phones), jailbreaks, and unsafe-content requests are denied by each service's own policies, with every provider exercising all three policy types. Unsafe content also shows **defense-in-depth**: what the gateway lets through is still refused by the model
 4. **Act 4 — The Audit Trail** — Use Databricks Genie to explore the three inference tables in plain English — no SQL required. Note these record requests that reached a model; policy-denied requests are not logged here
 5. **Act 5 — Usage Tracking** — Token consumption and latency per provider, plus billing-grade hourly aggregates from `system.ai_gateway.usage` across all three services — the chargeback view showing which provider is spending what
-6. **Act 6 — Rate Limiting** — Two burst tests against **different providers** show that budgets are per-service: a **QPM** burst (25 tiny requests, Claude) trips the queries-per-minute ceiling, and a **TPM** burst (8 large requests, OpenAI) trips the tokens-per-minute ceiling. Early requests pass (HTTP 200), later ones are rejected (HTTP 429) without retry
+6. **Act 6 — Rate Limiting** — Two burst tests against **different providers** show that budgets are per-service: a **QPM** burst (25 tiny requests, Claude) trips the queries-per-minute ceiling, and a **TPM** burst (8 large requests, OpenAI) trips the tokens-per-minute ceiling. Early requests pass (HTTP 200), later ones are rejected (HTTP 429) without retry.
+7. **Act 7 - MLflow Tracing** -- all blocked requests, including the blocked requests, are recorded as traces in the Unity Catalog. You peruse them via the Experiment tag as well as query its tables using Genie Agent. 
 
 ## Prerequisites
 
 - Databricks workspace with Unity Catalog enabled
 - Databricks personal access token (for local runs)
+- Prefconfigure all Unity AI Gateway Endpoints and associated tables in the Unity Catalog.
 
 ### Configure three model services in the Databricks UI
 
