@@ -10,7 +10,8 @@ MAX_RETRIES = 5
 INITIAL_BACKOFF = 2
 
 # Status codes worth retrying: 429 (rate limited) and 5xx (transient server /
-# guardrail-backend failures). Real guardrail blocks return 400 and are NOT retried.
+# guardrail-backend failures). A real guardrail block arrives as HTTP 200 with a
+# denying service policy, so it never reaches this set and is never retried.
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
@@ -105,6 +106,9 @@ def send_request(
     backoff = INITIAL_BACKOFF
     for attempt in range(MAX_RETRIES):
         try:
+            # Timed per attempt, not per call, so retry backoff sleeps are not
+            # billed as model latency.
+            attempt_start = time.perf_counter()
             resp = requests.post(
                 client.url,
                 headers={"Authorization": f"Bearer {client.token}"},
@@ -115,6 +119,7 @@ def send_request(
                 },
                 timeout=120,
             )
+            latency_s = round(time.perf_counter() - attempt_start, 2)
 
             if resp.status_code in RETRYABLE_STATUS and attempt < MAX_RETRIES - 1:
                 time.sleep(backoff)
@@ -130,6 +135,7 @@ def send_request(
                     "content": None,
                     "tokens": None,
                     "policy": None,
+                    "latency_s": latency_s,
                     "error": resp.text[:1000],
                 }
 
@@ -147,7 +153,27 @@ def send_request(
                     "total": usage.get("total_tokens", 0),
                 },
                 "policy": detect_policy_block(data),
+                "latency_s": latency_s,
                 "error": None,
+            }
+        except (requests.ConnectionError, requests.Timeout) as e:
+            # A dropped connection or read timeout is transient in the same way a
+            # 503 is, so retry it rather than reporting a spurious failure. Over a
+            # long high-volume run these are likely enough to matter.
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            return {
+                "agent": agent.display_name,
+                "provider": agent.provider,
+                "model": agent.model,
+                "status": 504,
+                "content": None,
+                "tokens": None,
+                "policy": None,
+                "latency_s": None,
+                "error": f"{type(e).__name__}: {e}",
             }
         except Exception as e:
             return {
@@ -158,6 +184,7 @@ def send_request(
                 "content": None,
                 "tokens": None,
                 "policy": None,
+                "latency_s": None,
                 "error": str(e),
             }
 
@@ -173,6 +200,9 @@ def run_scenario(
     result["description"] = scenario["description"]
     result["expected_outcome"] = scenario["expected_outcome"]
     result["guardrail_type"] = scenario["guardrail_type"]
+    # The agent key (not the display name) so callers can group by agent or look
+    # one up in the `agents` dict.
+    result["agent_key"] = scenario["agent"]
 
     # A guardrail block arrives as HTTP 200 + a denying service policy, so the
     # status code alone is not enough to tell blocked from allowed.
@@ -319,3 +349,29 @@ def print_result(result: dict) -> None:
         print(f"    Message:  {error_preview}")
 
     print()
+
+
+def print_progress(result: dict, index: int, total: int) -> None:
+    """Print one compact line for a result.
+
+    `print_result` emits a dozen lines plus a response preview, which is right for
+    a handful of scenarios but unreadable across a high-volume run. Use this for
+    the running log and `print_result` for a few representative requests.
+    """
+    verdict = "ok  " if result["pass"] else "FAIL"
+    tokens = (result.get("tokens") or {}).get("total") or 0
+    latency = result.get("latency_s") or 0.0
+
+    note = ""
+    if result["status"] == 429:
+        note = "  [rate-limited]"
+    elif result["status"] != 200:
+        note = f"  [HTTP {result['status']}]"
+    elif result.get("policy"):
+        note = f"  [{result['policy']['name']}]"
+
+    print(
+        f"  [{index:>3}/{total}] {verdict} {result['agent']:<12} {result['provider']:<7} "
+        f"{result['actual_outcome']:<8} {tokens:>5} tok {latency:>6.1f}s  "
+        f"{result['description'][:58]}{note}"
+    )

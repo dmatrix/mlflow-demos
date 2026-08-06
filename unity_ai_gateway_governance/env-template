@@ -25,3 +25,4 @@ GEMINI_MODEL=databricks-gemini-3-6-flash
 # table is discovered from the model-services API at runtime.
 # Unity AI Gateway Demo Catalog (uaig_demo)
 UC_CATALOG=uaig_demo
+MLFLOW_SCHEMA=uaigw_mlflow

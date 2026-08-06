@@ -19,7 +19,7 @@
 The notebook walks through six acts:
 
 1. **Act 1 — Verify the Gateway** — Verify all three model services and read back each one's **deployed** configuration from Unity Catalog: guardrail policies and the phases they run in, the routed model, the inference table, and rate-limit / usage-tracking settings. Fails fast, and warns when rate limits are missing
-2. **Act 2 — Simulate the Coding Agent Swarm** — Five simulated coding agents, each with its own persona system prompt, routed to **its provider's model service**: Cursor and Claude Code → Claude, Codex CLI → OpenAI, Gemini CLI and Pi → Gemini. Each MLflow trace is tagged with `agent`, `provider`, and `model_service` for per-agent and per-provider attribution
+2. **Act 2 — Simulate the Coding Agent Swarm** — Five simulated coding agents, each with its own persona system prompt, routed to **its provider's model service**: Cursor and Claude Code → Claude, Codex CLI → OpenAI, Gemini CLI and Pi → Gemini. Each agent sends **10 realistic coding requests (50 in total)** — linked lists, binary search, decorators, config and IaC, code review — drawn from the catalog in `clean_tasks.py` and issued round-robin so the provider rotates on every call. That volume is what gives the audit and chargeback questions in Acts 4 and 5 something real to answer. Every MLflow trace is tagged with `agent`, `provider`, and `model_service` for per-agent and per-provider attribution. **Budget 4–10 minutes** for this act; the catalog holds 15 tasks per agent, so raising `CLEAN_PER_AGENT` in the notebook to 15 gives 75 requests with no other change
 3. **Act 3 — Guardrails in Action** — PII (SSNs, credit cards, emails/phones), jailbreaks, and unsafe-content requests are denied by each service's own policies, with every provider exercising all three policy types. Unsafe content also shows **defense-in-depth**: what the gateway lets through is still refused by the model
 4. **Act 4 — The Audit Trail** — Use Databricks Genie to explore the three inference tables in plain English — no SQL required. Note these record requests that reached a model; policy-denied requests are not logged here
 5. **Act 5 — Usage Tracking** — Token consumption and latency per provider, plus billing-grade hourly aggregates from `system.ai_gateway.usage` across all three services — the chargeback view showing which provider is spending what
@@ -63,6 +63,13 @@ Repeat these steps **for each** of the three:
    | **TPM** (tokens/min) | `2000` | Low enough that the 8 large code-review requests exhaust the token budget after 1–2 calls |
 
    > **Note:** QPM and TPM are enforced independently — whichever ceiling is hit first triggers the 429. Keep TPM high enough (relative to the tiny QPM-test requests, ≈90 tokens each) that the QPM test is bound by the *call* limit, not the token limit; and keep TPM low enough that the large TPM-test requests are bound by the *token* limit. Skip this step entirely if you want all requests to pass through (HTTP 200).
+
+   > **These values are tuned for Act 6 and will choke Act 2.** Limits are per-service, so one setting has to serve both acts. Act 2 sends 50 requests averaging ~1,100 tokens each; against `QPM=8` / `TPM=2000` most of them draw a 429 and fall back on retry backoff, turning a 4–10 minute act into something far longer. Two workable options:
+   >
+   > * **Leave limits unset** (the default) while running Acts 1–5, then set them just before demoing Act 6. Acts 1–5 don't depend on rate limiting.
+   > * **Or raise them** for the volume acts — roughly `QPM=60` / `TPM=100000` covers 50 requests comfortably — and drop to `8` / `2000` for Act 6.
+   >
+   > If Act 2 reports requests that "exhausted retries on HTTP 429", this is why.
 
 Once all three are configured, copy each service's fully-qualified name (`catalog.schema.service`) into the matching `*_MODEL_SERVICE` variable in `.env` — or into the notebook's config cell when running on Databricks.
 
@@ -153,6 +160,7 @@ Before presenting Acts 4 and 5:
     | `GEMINI_MODEL_SERVICE` | Fully-qualified name of the Gemini model service |
     | `GEMINI_MODEL` | Model that service routes to (e.g., `databricks-gemini-3-6-flash`) — display label only |
     | `UC_CATALOG` | Unity Catalog catalog holding the inference tables (each service's exact table is discovered at runtime) |
+    | `MLFLOW_SCHEMA`| MLflow traces stored in the table |
 
 2. Install dependencies and launch the notebook:
 
@@ -201,7 +209,8 @@ unity_ai_gateway_governance/
 ├── ai_gateway_demo.ipynb   # Demo notebook (runs locally and on Databricks)
 ├── gateway_config.py       # GatewayConfig + verification and deployed-config lookup per model service
 ├── agent_simulator.py      # SimulatedAgent, GatewayClient, policy-block detection, request retry
-├── scenarios.py            # Test payloads: clean requests, PII, prompt injection, unsafe content
+├── scenarios.py            # Guardrail payloads (PII, injection, unsafe) + clean-scenario builder
+├── clean_tasks.py          # Catalog of 15 realistic coding tasks per agent (10 used by default)
 ├── prompts.py              # System prompts for each coding agent persona
 ├── observability.py        # SQL query templates for inference tables
 ├── images/
