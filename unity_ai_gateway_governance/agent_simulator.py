@@ -20,6 +20,8 @@ class SimulatedAgent:
     display_name: str
     system_prompt: str
     model: str
+    provider: str
+    model_service: str
 
 
 @dataclass
@@ -28,15 +30,59 @@ class GatewayClient:
     token: str
 
 
-def create_gateway_client(host: str, token: str, endpoint_name: str) -> GatewayClient:
-    """Create a client pointing at a guarded serving endpoint's invocations URL.
+def create_gateway_client(host: str, token: str) -> GatewayClient:
+    """Create a client pointing at the Unity AI Gateway chat-completions URL.
 
-    Guardrails (PII/safety) are attached to the serving endpoint, so requests
-    must hit /serving-endpoints/<endpoint>/invocations to be enforced. The
-    endpoint fronts a single model, so the request body carries no `model` field.
+    All governed model services share ONE gateway URL. The service is selected
+    per request by the `model` field, which carries the fully-qualified Unity
+    Catalog name (`catalog.schema.service`) — see `send_request`. Guardrails and
+    rate limits are attached to each model service, so routing through this URL
+    is what makes them apply.
     """
-    url = f"{host.rstrip('/')}/serving-endpoints/{endpoint_name}/invocations"
+    url = f"{host.rstrip('/')}/ai-gateway/mlflow/v1/chat/completions"
     return GatewayClient(url=url, token=token)
+
+
+def normalize_content(content) -> str:
+    """Flatten provider-specific content shapes into a plain string.
+
+    Gemini returns a list of blocks — [{"type": "text", "text": ...,
+    "thoughtSignature": ...}] — while Claude and GPT return a string. Only the
+    text is kept; `thoughtSignature` blobs are dropped.
+    """
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in content
+        )
+    return str(content)
+
+
+def detect_policy_block(data: dict) -> dict | None:
+    """Return the denying service policy, or None if the request wasn't blocked.
+
+    Unity AI Gateway answers a guardrail block with HTTP **200**, not 400: the
+    response carries `finish_reason: "content_filter"` and a top-level
+    `databricks_service_policy` object naming the policy and why it fired.
+    """
+    policy = data.get("databricks_service_policy") or {}
+    if policy.get("action") == "deny":
+        return {
+            "name": policy.get("name"),
+            "action": policy.get("action"),
+            "phase": policy.get("phase"),
+            "reason": policy.get("reason"),
+        }
+
+    # Defensive: a filtered response without the policy object still counts.
+    choices = data.get("choices") or [{}]
+    if choices[0].get("finish_reason") == "content_filter":
+        return {"name": "unknown", "action": "deny", "phase": None, "reason": None}
+    return None
 
 
 @mlflow.trace(span_type="CHAT_MODEL", name="gateway_request")
@@ -48,7 +94,13 @@ def send_request(
     """Send a chat completion through the gateway and return a result dict."""
     full_messages = [{"role": "system", "content": agent.system_prompt}] + messages
 
-    mlflow.update_current_trace(tags={"agent": agent.name})
+    mlflow.update_current_trace(
+        tags={
+            "agent": agent.name,
+            "provider": agent.provider,
+            "model_service": agent.model_service,
+        }
+    )
 
     backoff = INITIAL_BACKOFF
     for attempt in range(MAX_RETRIES):
@@ -56,7 +108,11 @@ def send_request(
             resp = requests.post(
                 client.url,
                 headers={"Authorization": f"Bearer {client.token}"},
-                json={"messages": full_messages, "max_tokens": 1024},
+                json={
+                    "model": agent.model_service,
+                    "messages": full_messages,
+                    "max_tokens": 1024,
+                },
                 timeout=120,
             )
 
@@ -68,10 +124,12 @@ def send_request(
             if resp.status_code != 200:
                 return {
                     "agent": agent.display_name,
+                    "provider": agent.provider,
                     "model": agent.model,
                     "status": resp.status_code,
                     "content": None,
                     "tokens": None,
+                    "policy": None,
                     "error": resp.text[:1000],
                 }
 
@@ -79,23 +137,27 @@ def send_request(
             usage = data.get("usage", {})
             return {
                 "agent": agent.display_name,
+                "provider": agent.provider,
                 "model": agent.model,
                 "status": 200,
-                "content": data["choices"][0]["message"]["content"],
+                "content": normalize_content(data["choices"][0]["message"]["content"]),
                 "tokens": {
                     "input": usage.get("prompt_tokens", 0),
                     "output": usage.get("completion_tokens", 0),
                     "total": usage.get("total_tokens", 0),
                 },
+                "policy": detect_policy_block(data),
                 "error": None,
             }
         except Exception as e:
             return {
                 "agent": agent.display_name,
+                "provider": agent.provider,
                 "model": agent.model,
                 "status": 500,
                 "content": None,
                 "tokens": None,
+                "policy": None,
                 "error": str(e),
             }
 
@@ -112,7 +174,10 @@ def run_scenario(
     result["expected_outcome"] = scenario["expected_outcome"]
     result["guardrail_type"] = scenario["guardrail_type"]
 
-    actual = "blocked" if result["status"] != 200 else "allowed"
+    # A guardrail block arrives as HTTP 200 + a denying service policy, so the
+    # status code alone is not enough to tell blocked from allowed.
+    blocked = result["status"] != 200 or result["policy"] is not None
+    actual = "blocked" if blocked else "allowed"
     result["actual_outcome"] = actual
     result["pass"] = actual == scenario["expected_outcome"]
     return result
@@ -130,6 +195,7 @@ def send_burst_request(
     otherwise show up as spurious 'error' rows, so those are retried briefly.
     """
     payload = {
+        "model": agent.model_service,
         "messages": [{"role": "system", "content": agent.system_prompt}] + messages,
         "max_tokens": 256,
     }
@@ -154,10 +220,14 @@ def send_burst_request(
         if resp.status_code == 200:
             data = resp.json()
             usage = data.get("usage", {})
+            content = normalize_content(
+                data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            )
+            policy = detect_policy_block(data)
             return {
                 "status": 200,
-                "outcome": "allowed",
-                "content": data.get("choices", [{}])[0].get("message", {}).get("content", "")[:200],
+                "outcome": "blocked" if policy else "allowed",
+                "content": content[:200],
                 "total_tokens": usage.get("total_tokens", 0),
             }
         return {
@@ -195,8 +265,12 @@ def print_burst_summary(results: list[dict]) -> None:
     allowed = sum(1 for r in results if r["outcome"] == "allowed")
     rate_limited = sum(1 for r in results if r["outcome"] == "rate_limited")
     errors = len(results) - allowed - rate_limited
+    blocked = sum(1 for r in results if r["outcome"] == "blocked")
+    errors -= blocked
     print(f"  Allowed:       {allowed}/{len(results)}")
     print(f"  Rate-limited:  {rate_limited}/{len(results)}")
+    if blocked:
+        print(f"  Guardrail-blocked: {blocked}/{len(results)}")
     if errors:
         print(f"  Errors:        {errors}/{len(results)}")
 
@@ -207,16 +281,32 @@ def print_result(result: dict) -> None:
     status_icon = "PASS" if passed else "FAIL"
     outcome_icon = "BLOCKED" if result["actual_outcome"] == "blocked" else "ALLOWED"
 
+    # PASS/FAIL is the assertion verdict (actual == expected), not the gateway's
+    # verdict — so a correctly blocked PII request is a PASS. Print the expected
+    # outcome alongside it to keep those two axes from reading as contradictory.
     print(f"  [{status_icon}] {result['description']}")
     print(f"    Agent:    {result['agent']}")
+    print(f"    Provider: {result.get('provider', '')}")
     print(f"    Model:    {result['model']}")
+    print(f"    Expected: {result['expected_outcome'].upper()}")
     print(f"    Status:   {result['status']} ({outcome_icon})")
+
+    # Guardrail blocks come back as HTTP 200, so the policy verdict — not the
+    # status code — is what shows which guardrail fired and why.
+    if result.get("policy"):
+        p = result["policy"]
+        phase = f", {p['phase']}" if p.get("phase") else ""
+        print(f"    Policy:   {p['name']} (deny{phase})")
+        if p.get("reason"):
+            print(f"    Reason:   {p['reason']}")
 
     if result["actual_outcome"] == "allowed" and result["tokens"]:
         t = result["tokens"]
         print(f"    Tokens:   {t['total']} (in: {t['input']}, out: {t['output']})")
 
-    if result.get("content"):
+    # When a policy denied the request the only "content" is the block notice,
+    # already reported above — don't dress it up as a model response.
+    if result.get("content") and not result.get("policy"):
         print("-------------------------------- RESPONSE --------------------------------")
         preview = result["content"][:750]
         if len(result["content"]) > 750:
