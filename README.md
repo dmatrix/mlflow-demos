@@ -38,15 +38,15 @@ The agent is evaluated along **three dimensions** using MLflow session-level jud
 
 ### `unity_ai_gateway_governance/`
 
-A notebook-driven demo showing how [Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway) provides centralized governance for coding agents. Simulates five agents (Cursor, Claude Code, Codex CLI, Gemini CLI, Pi) — each with its own persona system prompt — all routed through a **single guarded serving endpoint** (fronting one foundation model), and demonstrates:
+A notebook-driven demo showing how [Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway) provides centralized governance for coding agents. Simulates five agents (Cursor, Claude Code, Codex CLI, Gemini CLI, Pi) — each with its own persona system prompt, sending **10 realistic coding requests apiece (50 in total)** — spread across **three provider-specific governed model services** (Claude, OpenAI, Gemini). Each service is a Unity Catalog securable with its own guardrail policies, inference table, and rate limits, and all are reached through one gateway URL. Demonstrates:
 
-* **PII detection** — blocks requests containing SSNs, credit cards, etc. (HTTP 400)
+* **PII detection** — blocks requests containing SSNs, credit cards, emails and phone numbers. A block returns HTTP 200 with a denying `databricks_service_policy` that names the policy and explains what it found
 * **Safety & prompt-injection filters** — block jailbreaks and malware requests, with defense-in-depth: borderline unsafe content the gateway allows through is still refused by the model
-* **Inference tables** — all requests (including blocked) logged to Delta in Unity Catalog for audit and cost queries via Genie
-* **Usage tracking** — unified cost and token tracking across agents
-* **Rate limiting** — QPM (queries/min) and TPM (tokens/min) enforcement, returning HTTP 429 without hitting the model
+* **Inference tables** — requests logged to Delta in Unity Catalog (one table per service) for audit and cost queries via Genie
+* **Usage tracking** — per-provider cost and token attribution across agents
+* **Rate limiting** — per-service QPM (queries/min) and TPM (tokens/min) enforcement, returning HTTP 429 without hitting the model
 
-Requires a Databricks workspace with a serving endpoint and Unity Catalog. See the [full README](unity_ai_gateway_governance/README.md) for setup instructions.
+Requires a Databricks workspace with Unity Catalog and three AI Gateway model services. See the [full README](unity_ai_gateway_governance/README.md) for setup instructions.
 
 ## Quickstart
 

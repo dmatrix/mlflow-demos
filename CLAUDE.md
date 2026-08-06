@@ -2,7 +2,7 @@
 
 ## Project overview
 
-Demo agents and notebooks showcasing MLflow GenAI evaluation and Databricks governance capabilities. Contains two main demos: a multi-turn restaurant research agent (`devconnect/resturant_research_bot`) evaluated with MLflow session-level judges, and an AI Gateway governance demo (`unity_ai_gateway_governance/`) showing centralized guardrails for coding agents.
+Demo agents and notebooks showcasing MLflow GenAI evaluation and Databricks governance capabilities. Contains two main demos: a multi-turn restaurant research agent (`devconnect/resturant_research_bot`) evaluated with MLflow session-level judges, and an AI Gateway governance demo (`unity_ai_gateway_governance/`) showing centralized guardrails for coding agents across three provider-specific governed model services.
 
 ## Layout
 
@@ -20,12 +20,13 @@ devconnect/
     search_tool.py                   # Tavily web_search() tool wrapper
 
 unity_ai_gateway_governance/
-  ai_gateway_demo.ipynb            # Main demo notebook (4 acts)
-  gateway_config.py                # GatewayConfig dataclass + SDK helpers for AI Gateway
-  agent_simulator.py               # SimulatedAgent, GatewayClient, request handling with retry
-  scenarios.py                     # Test payloads: clean requests, PII, prompt injection
+  ai_gateway_demo.ipynb            # Main demo notebook (6 acts)
+  gateway_config.py                # GatewayConfig + verify_gateway, fetch_service_config per model service
+  agent_simulator.py               # SimulatedAgent, GatewayClient, policy-block detection, request retry
+  scenarios.py                     # Guardrail payloads (PII, injection, unsafe) + clean-scenario builder
+  clean_tasks.py                   # Catalog of 15 realistic coding tasks per agent (10 used by default)
   prompts.py                       # System prompts for each coding agent persona
-  observability.py                 # SQL query templates for inference tables
+  observability.py                 # SQL query templates for inference tables + system.ai_gateway.usage
   images/
     ai_gateway_architecture.svg    # Architecture diagram
 ```
