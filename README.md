@@ -34,6 +34,8 @@ Three session-level judges score it:
 | `context_retention` | Does the agent remember prior constraints (allergies, location, preferences)? |
 | `search_quality` | Did the agent search when needed and skip when it wasn't? |
 
+Runs as a CLI or notebook, against OpenAI or Databricks-hosted models. See the [full README](devconnect/README.md) for credentials, run modes, and the four scenarios.
+
 ### `unity_ai_gateway_governance/`
 
 A notebook demo of [Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway) as centralized governance for coding agents. Five simulated agents — Cursor, Claude Code, Codex CLI, Gemini CLI, Pi — each with its own persona prompt, send 10 coding requests apiece across three provider-specific governed model services (Claude, OpenAI, Gemini). Each service is a Unity Catalog securable with its own guardrails, inference table, and rate limits; all three are reached through one gateway URL.
@@ -53,7 +55,8 @@ Needs a Databricks workspace with Unity Catalog and three AI Gateway model servi
 - Python 3.10+
 - [`uv`](https://docs.astral.sh/uv/) (recommended) or `pip`
 - An OpenAI API key
-- A [Tavily](https://tavily.com) API key, for web search
+- A [Tavily](https://tavily.com) API key, for web search and devconnect and resturant bot demo
+- MLflow 3.14+
 
 ### Install
 
@@ -61,70 +64,13 @@ Needs a Databricks workspace with Unity Catalog and three AI Gateway model servi
 uv sync
 ```
 
-### Configure credentials
+### Set up a demo
 
-Copy the `env-template` at the repo root into `devconnect/restaurant_research_bot/` as `.env`:
+Each demo owns its own setup — credentials, run modes, and walkthrough:
 
-```bash
-cp env-template devconnect/restaurant_research_bot/.env
-```
-
-Then fill in:
-
-```bash
-OPENAI_API_KEY=sk-...
-TAVILY_API_KEY=tvly-...
-OPENAI_API_BASE=https://api.openai.com/v1
-MLFLOW_TRACKING_URI=http://localhost:5000
-
-# Databricks (only if using --provider databricks)
-DATABRICKS_HOST=https://<your-workspace>.cloud.databricks.com
-DATABRICKS_TOKEN=dapi...
-```
-
-### Run the CLI
-
-```bash
-# Start the MLflow tracking server
-mlflow server --backend-store-uri sqlite:///mlflow.db --port 5000
-
-# All scenarios, with OpenAI
-uv run mlflow-restaurant-research-bot
-
-# One scenario
-uv run mlflow-restaurant-research-bot --scenario allergen
-
-# Databricks-hosted models
-uv run mlflow-restaurant-research-bot \
-  --provider databricks \
-  --model databricks-gpt-5-mini
-```
-
-### Run the notebook
-
-```bash
-mlflow server --backend-store-uri sqlite:///mlflow.db --port 5000   # tracking server at http://localhost:5000
-jupyter notebook devconnect/restaurant_research_bot/restaurant_research_agent_devconnect.ipynb
-```
-
-### Databricks
-
-Set these instead of an OpenAI key:
-
-```bash
-DATABRICKS_HOST=https://your-workspace.azuredatabricks.net
-DATABRICKS_TOKEN=dapi...
-TAVILY_API_KEY=tvly-...
-```
-
-## Scenarios
-
-| Scenario | Key challenge |
-|---|---|
-| `restaurant` | Multi-turn discovery; turn 4 synthesizes without re-searching |
-| `safety` | Resolves implicit references ("that restaurant") into concrete search queries |
-| `allergen` | Carries a peanut allergy into a later search without being reminded |
-| `nosearch` | Stays within general knowledge for all four turns; correct behavior is zero searches |
+- **`devconnect/restaurant_research_bot`** — [devconnect/README.md](devconnect/README.md)
+- **`unity_ai_gateway_governance/`** — [unity_ai_gateway_governance/README.md](unity_ai_gateway_governance/README.md)
+- **`agentbricks/fema-disaster`** — [agentbricks/fema-disaster/README.md](agentbricks/fema-disaster/README.md)
 
 ## Stack
 
