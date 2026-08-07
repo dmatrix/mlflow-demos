@@ -1,34 +1,32 @@
 # MLflow Demos
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![MLflow 3.14](https://img.shields.io/badge/mlflow-3.10-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org)
+[![MLflow 3.15](https://img.shields.io/badge/mlflow-3.15-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org)
 [![uv](https://img.shields.io/badge/uv-package%20manager-7C3AED?logo=uv&logoColor=white)](https://docs.astral.sh/uv/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-compatible-412991?logo=openai&logoColor=white)](https://openai.com)
 [![Tavily](https://img.shields.io/badge/Tavily-web%20search-00B4D8)](https://tavily.com)
 
-Demo agents and notebooks showcasing [MLflow](https://mlflow.org) GenAI evaluation capabilities, built for DevConnect and AI Conferences
+Demo agents and notebooks for [MLflow](https://mlflow.org) GenAI evaluation, built for DevConnect and AI conferences.
 
-## What's Here
+## What's here
 
 ### `agentbricks/fema-disaster`
 
-A **Databricks Asset Bundle** that deploys a multi-agent supervisor for FEMA disaster response using 100% Databricks-native components. A Supervisor Agent routes queries to a **Genie Space** (structured data: disaster counts, federal aid, severity trends) and a **Knowledge Assistant** (policy retrieval: evacuation protocols, aid eligibility, safety guidelines) backed by Vector Search. Includes MLflow GenAI evaluation with built-in scorers and individual judge assessments.
+A Databricks Asset Bundle that deploys a multi-agent supervisor for FEMA disaster response, using only Databricks-native components. A supervisor agent routes queries to either a Genie Space for structured data (disaster counts, federal aid, severity trends) or a Knowledge Assistant backed by Vector Search for policy retrieval (evacuation protocols, aid eligibility, safety guidelines). Includes MLflow GenAI evaluation with built-in scorers and per-judge assessments.
 
-Deploys to serverless compute with two `databricks bundle` commands. See the [full README](agentbricks/fema-disaster/README.md) for setup instructions.
+Deploys to serverless compute with two `databricks bundle` commands. See the [full README](agentbricks/fema-disaster/README.md).
 
 ### `devconnect/restaurant_research_bot`
 
-A multi-turn conversational agent that researches restaurants using live web search, evaluated with MLflow session-level judges.
+A multi-turn agent that researches restaurants with live web search, evaluated by MLflow session-level judges. Built for caterers, Caspers Kitchens clients, and anyone researching restaurants for:
 
-This agent can be used by caterers, **Caspers Kitchens** clients or customers, and anyone interested in researching restaurants for the following scenarios:
+* **Food allergies** — dishes and restaurants that accommodate dietary restrictions (peanut-free, gluten-free, vegan)
+* **Ratings and recommendations** — highly rated restaurants by neighborhood, cuisine, or preference
+* **Safety inspections** — health inspection scores and recent violations for a specific restaurant
+* **Menus and hours** — current hours, menus, and allergen-friendly options
+* **Personalized advice** — synthesized across turns, with the agent remembering preferences as the conversation goes
 
-* **Food allergies** — identify dishes and restaurants that accommodate specific dietary restrictions (e.g. peanut-free, gluten-free, vegan)
-* **Restaurant ratings & recommendations** — discover highly rated restaurants by neighborhood, cuisine, or preference
-* **Food safety inspections** — look up health inspection scores and recent violation reports for a specific restaurant
-* **Menu & hours** — find current operating hours, menus, and vegetarian or allergen-friendly options
-* **Personalized recommendations** — get synthesized advice across multiple turns, with the agent remembering your preferences throughout the conversation
-
-The agent is evaluated along **three dimensions** using MLflow session-level judges:
+Three session-level judges score it:
 
 | Judge | Measures |
 |---|---|
@@ -38,15 +36,15 @@ The agent is evaluated along **three dimensions** using MLflow session-level jud
 
 ### `unity_ai_gateway_governance/`
 
-A notebook-driven demo showing how [Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway) provides centralized governance for coding agents. Simulates five agents (Cursor, Claude Code, Codex CLI, Gemini CLI, Pi) — each with its own persona system prompt, sending **10 realistic coding requests apiece (50 in total)** — spread across **three provider-specific governed model services** (Claude, OpenAI, Gemini). Each service is a Unity Catalog securable with its own guardrail policies, inference table, and rate limits, and all are reached through one gateway URL. Demonstrates:
+A notebook demo of [Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway) as centralized governance for coding agents. Five simulated agents — Cursor, Claude Code, Codex CLI, Gemini CLI, Pi — each with its own persona prompt, send 10 coding requests apiece across three provider-specific governed model services (Claude, OpenAI, Gemini). Each service is a Unity Catalog securable with its own guardrails, inference table, and rate limits; all three are reached through one gateway URL.
 
-* **PII detection** — blocks requests containing SSNs, credit cards, emails and phone numbers. A block returns HTTP 200 with a denying `databricks_service_policy` that names the policy and explains what it found
-* **Safety & prompt-injection filters** — block jailbreaks and malware requests, with defense-in-depth: borderline unsafe content the gateway allows through is still refused by the model
-* **Inference tables** — requests logged to Delta in Unity Catalog (one table per service) for audit and cost queries via Genie
-* **Usage tracking** — per-provider cost and token attribution across agents
-* **Rate limiting** — per-service QPM (queries/min) and TPM (tokens/min) enforcement, returning HTTP 429 without hitting the model
+* **PII detection** — blocks SSNs, credit cards, emails, and phone numbers. A block returns HTTP 200 with a denying `databricks_service_policy` naming the policy and what it found
+* **Safety and prompt-injection filters** — block jailbreaks and malware requests. Defense in depth: borderline content the gateway allows through, the model still refuses
+* **Inference tables** — requests logged to Delta, one table per service, for audit and cost queries via Genie
+* **Usage tracking** — per-provider cost and token attribution
+* **Rate limiting** — per-service QPM and TPM ceilings, returning HTTP 429 without reaching the model
 
-Requires a Databricks workspace with Unity Catalog and three AI Gateway model services. See the [full README](unity_ai_gateway_governance/README.md) for setup instructions.
+Needs a Databricks workspace with Unity Catalog and three AI Gateway model services. See the [full README](unity_ai_gateway_governance/README.md).
 
 ## Quickstart
 
@@ -55,7 +53,7 @@ Requires a Databricks workspace with Unity Catalog and three AI Gateway model se
 - Python 3.10+
 - [`uv`](https://docs.astral.sh/uv/) (recommended) or `pip`
 - An OpenAI API key
-- A [Tavily](https://tavily.com) API key (for web search)
+- A [Tavily](https://tavily.com) API key, for web search
 
 ### Install
 
@@ -65,13 +63,13 @@ uv sync
 
 ### Configure credentials
 
-An `env-template` file is included at the repo root with all required variables. Copy it into `devconnect/restaurant_research_bot/` and rename it `.env`:
+Copy the `env-template` at the repo root into `devconnect/restaurant_research_bot/` as `.env`:
 
 ```bash
 cp env-template devconnect/restaurant_research_bot/.env
 ```
 
-Then fill in your values:
+Then fill in:
 
 ```bash
 OPENAI_API_KEY=sk-...
@@ -87,15 +85,16 @@ DATABRICKS_TOKEN=dapi...
 ### Run the CLI
 
 ```bash
-# start the MLFlwo tracking server 
+# Start the MLflow tracking server
 mlflow server --backend-store-uri sqlite:///mlflow.db --port 5000
-# Default: runs all scenarios with OpenAI
+
+# All scenarios, with OpenAI
 uv run mlflow-restaurant-research-bot
 
-# Run a specific scenario
+# One scenario
 uv run mlflow-restaurant-research-bot --scenario allergen
 
-# Run with Databricks-hosted models
+# Databricks-hosted models
 uv run mlflow-restaurant-research-bot \
   --provider databricks \
   --model databricks-gpt-5-mini
@@ -104,7 +103,7 @@ uv run mlflow-restaurant-research-bot \
 ### Run the notebook
 
 ```bash
-mlflow server --backend-store-uri sqlite:///mlflow.db --port 5000        # start the tracking server at http://localhost:5000
+mlflow server --backend-store-uri sqlite:///mlflow.db --port 5000   # tracking server at http://localhost:5000
 jupyter notebook devconnect/restaurant_research_bot/restaurant_research_agent_devconnect.ipynb
 ```
 
@@ -118,18 +117,18 @@ DATABRICKS_TOKEN=dapi...
 TAVILY_API_KEY=tvly-...
 ```
 
-## Available Scenarios
+## Scenarios
 
 | Scenario | Key challenge |
 |---|---|
-| `restaurant` | Multi-turn restaurant discovery; turn 4 synthesises without re-searching |
+| `restaurant` | Multi-turn discovery; turn 4 synthesizes without re-searching |
 | `safety` | Resolves implicit references ("that restaurant") into concrete search queries |
-| `allergen` | Silently carries a peanut allergy constraint into a later search without being told to |
-| `nosearch` | Stays within general knowledge for all four turns; correct behaviour = zero searches |
+| `allergen` | Carries a peanut allergy into a later search without being reminded |
+| `nosearch` | Stays within general knowledge for all four turns; correct behavior is zero searches |
 
 ## Stack
 
-- **MLflow 3.10** — experiment tracking, tracing, and `mlflow.genai.evaluate()`
-- **OpenAI / Databricks** — agent and judge LLMs (switchable via `--provider`)
-- **Tavily** — real-time web search tool
-- **LiteLLM** — provider abstraction layer
+- **MLflow 3.15** — experiment tracking, tracing, and `mlflow.genai.evaluate()`
+- **OpenAI / Databricks** — agent and judge LLMs, switchable via `--provider`
+- **Tavily** — real-time web search
+- **LiteLLM** — provider abstraction

@@ -2,82 +2,79 @@
 
 ![AI Gateway Architecture](./images/ai_gateway_architecture.png)
 
-**The problem:** Your organization has dozens of developers using multiple coding harnesses: Cursor, Claude Code, Codex CLI, Gemini CLI, and Pi — spread across different model providers. Each agent calls an LLM with its own API key. You have no visibility into who is spending what, no guardrails against data leaks, and no audit trail.
+**The problem:** your developers use Cursor, Claude Code, Codex CLI, Gemini CLI, and Pi, spread across different model providers. Each agent calls an LLM with its own API key. Nobody knows who is spending what, nothing stops a prompt carrying customer data, and there is no audit trail.
 
-**The solution:** Route every coding agent through Databricks Unity AI Gateway, to a **provider-specific governed model service** (Claude, OpenAI, Gemini). Each service is a Unity Catalog securable named `catalog.schema.service`, with its **own** guardrail policies, inference table, and rate limits — so each provider is governed independently while every request flows through one gateway. This notebook demonstrates the three governance and security pillars:
+**The solution:** route every agent through Unity AI Gateway to a governed model service, one per provider. Each service is a Unity Catalog securable named `catalog.schema.service` that carries its own guardrails, inference table, and rate limits. Every request goes through one gateway, but policy is enforced per service.
 
 | Pillar | What it does |
 |--------|--------------|
-| **Security & Auditability** | Per-service guardrails (PII detection, jailbreak, unsafe content), requests logged to Unity Catalog inference tables |
-| **Cost Management** | Per-service rate limiting (QPM/TPM), unified billing, budget allocation per user/group |
-| **Observability** | Inference tables in Delta (one per service), per-provider metrics, usage dashboard, and MLflow tracing |
+| Security & auditability | Per-service guardrails (PII, jailbreak, unsafe content); requests logged to inference tables |
+| Cost management | Per-service rate limits (QPM/TPM), unified billing, budgets per user or group |
+| Observability | Inference tables in Delta, per-provider metrics, usage dashboard, MLflow tracing |
 
 > **Reference:** [Governing Coding Agent Sprawl with Unity AI Gateway](https://www.databricks.com/blog/governing-coding-agent-sprawl-unity-ai-gateway)
 
 ## What the demo covers
 
-The notebook walks through six acts:
+| Act | What it shows |
+|-----|---------------|
+| 1. Verify the gateway | Reads each service's deployed config back from Unity Catalog: guardrail policies and their phases, routed model, inference table, rate limits. Fails fast and warns when anything is missing. |
+| 2. Simulate the agent swarm | Five agents, each with its own persona prompt, each routed to its provider's service. 50 realistic coding requests. |
+| 3. Guardrails in action | PII, jailbreak, and unsafe-content requests denied by each service's own policies. Unsafe content also shows defense in depth: what the gateway allows through, the model still refuses. |
+| 4. The audit trail | Explore the three inference tables in plain English with Genie. No SQL. |
+| 5. Usage tracking | Tokens and latency per provider, plus hourly aggregates from `system.ai_gateway.usage`. The chargeback view. |
+| 6. Rate limiting | Two bursts against different providers prove budgets are per-service: 25 tiny requests trip QPM on Claude, 8 large ones trip TPM on OpenAI. Early requests pass, later ones get HTTP 429. |
+| 7. MLflow tracing | Every request, allowed or denied, recorded as a trace. Browse by experiment or query the trace tables with Genie. |
+| 8. Finale | A dashboard pulling it together: performance, cost, and per-agent usage. |
 
-1. **Act 1 — Verify the Gateway** — Verify all three model services and read back each one's **deployed** configuration from Unity Catalog: guardrail policies and the phases they run in, the routed model, the inference table, and rate-limit / usage-tracking settings. Fails fast, and warns when rate limits are missing
-2. **Act 2 — Simulate the Coding Agent Swarm** — Five simulated coding agents, each with its own persona system prompt, routed to **its provider's model service**: Cursor and Claude Code → Claude, Codex CLI → OpenAI, Gemini CLI and Pi → Gemini. Each agent sends **10 realistic coding requests (50 in total)** — linked lists, binary search, decorators, config and IaC, code review — drawn from the catalog in `clean_tasks.py` and issued round-robin so the provider rotates on every call. That volume is what gives the audit and chargeback questions in Acts 4 and 5 something real to answer. Every MLflow trace is tagged with `agent`, `provider`, and `model_service` for per-agent and per-provider attribution. **Budget 4–10 minutes** for this act; the catalog holds 15 tasks per agent, so raising `CLEAN_PER_AGENT` in the notebook to 15 gives 75 requests with no other change
-3. **Act 3 — Guardrails in Action** — PII (SSNs, credit cards, emails/phones), jailbreaks, and unsafe-content requests are denied by each service's own policies, with every provider exercising all three policy types. Unsafe content also shows **defense-in-depth**: what the gateway lets through is still refused by the model
-4. **Act 4 — The Audit Trail** — Use Databricks Genie to explore the three inference tables in plain English — no SQL required. Note these record requests that reached a model; policy-denied requests are not logged here
-5. **Act 5 — Usage Tracking** — Token consumption and latency per provider, plus billing-grade hourly aggregates from `system.ai_gateway.usage` across all three services — the chargeback view showing which provider is spending what
-6. **Act 6 — Rate Limiting** — Two burst tests against **different providers** show that budgets are per-service: a **QPM** burst (25 tiny requests, Claude) trips the queries-per-minute ceiling, and a **TPM** burst (8 large requests, OpenAI) trips the tokens-per-minute ceiling. Early requests pass (HTTP 200), later ones are rejected (HTTP 429) without retry.
-7. **Act 7 - MLflow Tracing** -- all blocked requests, including the blocked requests, are recorded as traces in the Unity Catalog. You peruse them via the Experiment tag as well as query its tables using Genie Agent. 
+Agent-to-provider routing: Cursor and Claude Code use Claude, Codex CLI uses OpenAI, Gemini CLI and Pi use Gemini.
+
+**About Act 2's volume.** Each agent sends 10 requests drawn from `clean_tasks.py` — linked lists, binary search, decorators, config and IaC, code review — issued round-robin so the provider rotates on every call. Sparse traffic makes the Genie questions in Acts 4 and 5 boring, which is the only reason the count matters. Budget 4–10 minutes. The catalog holds 15 tasks per agent, so raising `CLEAN_PER_AGENT` to 15 gets you 75 requests and nothing else changes.
+
+Every trace is tagged with `agent`, `provider`, and `model_service`, which is what makes per-agent and per-provider attribution possible.
 
 ## Prerequisites
 
-- Databricks workspace with Unity Catalog enabled
-- Databricks personal access token (for local runs)
-- Prefconfigure all Unity AI Gateway Endpoints and associated tables in the Unity Catalog.
+- A Databricks workspace with Unity Catalog
+- A personal access token, for local runs
+- Three AI Gateway model services, configured as below
 
-### Configure three model services in the Databricks UI
+## Configure the three model services
 
-The notebook is a pure **consumer** of pre-existing model services — it does not create or reconfigure them. Create **three** services in your workspace, one per provider, and give each the **same** guardrail and rate-limit policies so only the routed model differs:
+The notebook only consumes model services; it never creates or changes one. Create three, one per provider, and give them identical guardrail and rate-limit settings so the routed model is the only difference.
 
-| Provider | Routed model | Agents that use it |
-|----------|--------------|--------------------|
+| Provider | Routed model | Agents |
+|----------|--------------|--------|
 | Claude | e.g. `databricks-claude-opus-4-8` | Cursor, Claude Code |
 | OpenAI | e.g. `databricks-gpt-5-6-sol` | Codex CLI |
 | Gemini | e.g. `databricks-gemini-3-6-flash` | Gemini CLI, Pi |
 
-Repeat these steps **for each** of the three:
+For each service:
 
-1. **Create the model service** — add a new AI Gateway **model service** and pick the foundation model it routes to. It is created as a Unity Catalog securable named `catalog.schema.service`; that fully-qualified name is what the notebook sends in the request's `model` field.
+1. **Create it.** Add an AI Gateway model service and pick the foundation model it routes to. It becomes a Unity Catalog securable named `catalog.schema.service`. That fully-qualified name is what the notebook sends as the request's `model` field.
 
-2. **Configure guardrails** — under **Guardrails**, enable:
-   - **PII Detection** — set mode to **Block** to reject requests containing SSNs, credit card numbers, emails, phone numbers, and names
-   - **Jailbreak and Prompt Injection** — enable to block DAN prompts and attempts to extract system instructions
-   - **Unsafe Content** — enable to block unsafe content
+2. **Turn on guardrails.** Enable PII detection in **Block** mode (SSNs, credit cards, emails, phone numbers, names), jailbreak and prompt-injection detection, and unsafe-content detection. Where a phase is offered, enable both the request (`pre_call`) and the response (`post_call`) — Act 1 prints the phases you actually ended up with.
 
-   Enable each on **both** the request (`pre_call`) and response (`post_call`) phases where offered — Act 1 prints the phases actually configured.
+3. **Enable inference tables.** Point logging at a Unity Catalog schema. The table is named `<service-name>_payload`. Check the destination schema: the table can land in a different schema than the service itself, which makes the Genie setup for Acts 4 and 5 confusing. Act 1 discovers the real path and warns you when they diverge.
 
-3. **Enable inference tables** — turn on logging and point it at a Unity Catalog schema. The table is named `<service-name>_payload`. **Check the destination schema carefully:** the table can end up in a different schema than the service itself, which makes the Act 4/5 Genie setup confusing. Act 1 discovers the real path and warns when it doesn't match.
+4. **Enable usage tracking.** Without it, `system.ai_gateway.usage` has no rows and Act 5's chargeback query comes back empty.
 
-4. **Enable usage tracking** — turn on **Usage Tracking** to capture per-request token counts. Without it, `system.ai_gateway.usage` returns no rows and Act 5's chargeback query is empty.
-
-5. **Configure rate limits** — set both a QPM (queries-per-minute) and a TPM (tokens-per-minute) limit. This powers the two burst tests in Act 6; **without limits, every burst request returns HTTP 200 and Act 6 shows nothing.** Recommended demo values (per user *and* per service):
+5. **Set rate limits.** Act 6 needs both a QPM and a TPM limit; without them every burst request returns 200 and the act shows nothing.
 
    | Limit | Value | Why |
    |-------|-------|-----|
-   | **QPM** (calls/min) | `8` | Well below the 25-request QPM burst, so the queries-per-minute ceiling is clearly hit part-way through. (The gateway allows some burst above the nominal limit, so set QPM comfortably under the burst size for a clean cutoff.) |
-   | **TPM** (tokens/min) | `2000` | Low enough that the 8 large code-review requests exhaust the token budget after 1–2 calls |
+   | QPM | `8` | Well under the 25-request burst, so the ceiling is hit part-way through. The gateway allows some burst above the nominal limit, so leave room for a clean cutoff. |
+   | TPM | `2000` | Low enough that the 8 large code-review requests exhaust it after one or two calls. |
 
-   > **Note:** QPM and TPM are enforced independently — whichever ceiling is hit first triggers the 429. Keep TPM high enough (relative to the tiny QPM-test requests, ≈90 tokens each) that the QPM test is bound by the *call* limit, not the token limit; and keep TPM low enough that the large TPM-test requests are bound by the *token* limit. Skip this step entirely if you want all requests to pass through (HTTP 200).
+   The two ceilings are enforced independently and whichever is hit first triggers the 429. Keep TPM high enough that the tiny QPM-test requests (~90 tokens each) are bound by the call limit rather than the token limit, and low enough that the large TPM-test requests are bound by tokens.
 
-   > **These values are tuned for Act 6 and will choke Act 2.** Limits are per-service, so one setting has to serve both acts. Act 2 sends 50 requests averaging ~1,100 tokens each; against `QPM=8` / `TPM=2000` most of them draw a 429 and fall back on retry backoff, turning a 4–10 minute act into something far longer. Two workable options:
-   >
-   > * **Leave limits unset** (the default) while running Acts 1–5, then set them just before demoing Act 6. Acts 1–5 don't depend on rate limiting.
-   > * **Or raise them** for the volume acts — roughly `QPM=60` / `TPM=100000` covers 50 requests comfortably — and drop to `8` / `2000` for Act 6.
-   >
-   > If Act 2 reports requests that "exhausted retries on HTTP 429", this is why.
+   > **These values suit Act 6 and will choke Act 2.** Limits are per-service, so one setting has to serve both. Act 2 sends 50 requests averaging ~1,100 tokens; against `QPM=8`/`TPM=2000` most draw a 429 and fall back on retry backoff. Either leave limits unset until you're ready to demo Act 6 (Acts 1–5 don't need them), or run the volume acts at roughly `QPM=60`/`TPM=100000` and drop down for Act 6. If Act 2 reports requests that "exhausted retries on HTTP 429", this is why.
 
-Once all three are configured, copy each service's fully-qualified name (`catalog.schema.service`) into the matching `*_MODEL_SERVICE` variable in `.env` — or into the notebook's config cell when running on Databricks.
+Once all three exist, copy each fully-qualified name into the matching `*_MODEL_SERVICE` variable in `.env`, or into the notebook's config cell when running on Databricks.
 
-### How agents reach the gateway
+## How agents reach the gateway
 
-All three services share **one** URL, and the `model` field selects which one handles the request:
+All three services share one URL. The `model` field picks which one handles the request:
 
 ```bash
 curl $DATABRICKS_HOST/ai-gateway/mlflow/v1/chat/completions \
@@ -90,7 +87,7 @@ curl $DATABRICKS_HOST/ai-gateway/mlflow/v1/chat/completions \
   }'
 ```
 
-Because the API is OpenAI-compatible, pointing a real coding agent at the gateway is just a `base_url` change:
+The API is OpenAI-compatible, so pointing a real coding agent at the gateway is a `base_url` change:
 
 ```python
 from openai import OpenAI
@@ -106,11 +103,11 @@ client.chat.completions.create(
 )
 ```
 
-That `model` value is both the routing key and the governance boundary — it decides which service's guardrails and rate limits apply.
+That `model` value is both the routing key and the governance boundary. It decides whose guardrails and rate limits apply.
 
-### Reading a guardrail block
+## Reading a guardrail block
 
-A blocked request returns **HTTP 200**, not an error status. The verdict is in the response body:
+A blocked request returns **HTTP 200**, not an error. The verdict is in the body:
 
 ```json
 {
@@ -127,24 +124,24 @@ A blocked request returns **HTTP 200**, not an error status. The verdict is in t
 }
 ```
 
-So detect blocks via `databricks_service_policy.action == "deny"` (see `detect_policy_block` in `agent_simulator.py`) — **filtering on `status_code != 200` will not find them.**
+So detect blocks with `databricks_service_policy.action == "deny"` (see `detect_policy_block` in `agent_simulator.py`). Filtering on `status_code != 200` will not find them.
 
-Two consequences worth knowing before you build dashboards on this (both verified against live services):
+Two things to know before building dashboards on this:
 
-* **Blocked requests are not written to the inference table.** A denied request never reaches the model, and the table records model invocations — so there is no row for it. The inference table answers *"what did our agents send to models, and what did it cost?"*, not *"what did we block?"* Use the policy verdicts and MLflow traces for the blocking evidence.
-* **Response content shape differs by provider.** Gemini returns `content` as a list of blocks (`[{"type": "text", "text": ..., "thoughtSignature": ...}]`) while Claude and GPT return a plain string. `normalize_content` in `agent_simulator.py` flattens both and drops the `thoughtSignature` blobs.
+- **Denied requests never reach the inference table.** The table records model invocations, and a denied request never became one. It answers "what did our agents send, and what did it cost?" — not "what did we block?" The blocking evidence lives in the policy verdicts and MLflow traces.
+- **Response shape varies by provider.** Gemini returns `content` as a list of blocks (`[{"type": "text", "text": ..., "thoughtSignature": ...}]`) where Claude and GPT return a string. `normalize_content` in `agent_simulator.py` flattens both and drops the `thoughtSignature` blobs.
 
-### Set up a Genie Agent
+A related trap when writing your own clean prompts: because PII runs on `post_call` too, a harmless prompt can be denied for what the *model* wrote back. A request for a `pyproject.toml` gets denied when the model fills in an author email, and an nginx config gets denied for the upstream IP address. Ask for the artifact without those fields.
 
-Before presenting Acts 4 and 5:
+## Set up Genie for Acts 4 and 5
 
-1. In your Databricks workspace, open **Genie** and create a new Genie Agent.
-2. Add **all three** `<service-name>_payload` inference tables as data sources. Act 1 prints the exact paths under `Discovered inference tables:` — use those rather than guessing, since a table may live in a different schema than its service. For Act 5's chargeback query, also add `system.ai_gateway.usage`.
-3. Keep the Genie space open during the demo. Acts 4 and 5 provide ready-made questions to paste directly into the space — no code execution is required.
+1. Open **Genie** in your workspace and create an agent.
+2. Add all three `<service-name>_payload` tables as data sources. Act 1 prints the exact paths under `Discovered inference tables:` — use those rather than guessing, since a table may live outside its service's schema. Add `system.ai_gateway.usage` too, for Act 5.
+3. Keep the space open during the demo. Acts 4 and 5 supply questions to paste in; no code to run.
 
 ## Running locally
 
-1. Create a `.env` file from the template and fill in your values:
+1. Create a `.env` from the template:
 
     ```bash
     cd unity_ai_gateway_governance
@@ -153,39 +150,39 @@ Before presenting Acts 4 and 5:
 
     | Variable | Description |
     |----------|-------------|
-    | `DATABRICKS_HOST` | Workspace URL (e.g., `https://<workspace>.cloud.databricks.com`) |
+    | `DATABRICKS_HOST` | Workspace URL, e.g. `https://<workspace>.cloud.databricks.com` |
     | `DATABRICKS_TOKEN` | Personal access token |
-    | `CLAUDE_MODEL_SERVICE` | Fully-qualified name of the Claude model service (`catalog.schema.service`) — sent as the request's `model` field |
-    | `CLAUDE_MODEL` | Model that service routes to (e.g., `databricks-claude-opus-4-8`) — display label only |
-    | `OPENAI_MODEL_SERVICE` | Fully-qualified name of the OpenAI model service |
-    | `OPENAI_MODEL` | Model that service routes to (e.g., `databricks-gpt-5-6-sol`) — display label only |
-    | `GEMINI_MODEL_SERVICE` | Fully-qualified name of the Gemini model service |
-    | `GEMINI_MODEL` | Model that service routes to (e.g., `databricks-gemini-3-6-flash`) — display label only |
-    | `UC_CATALOG` | Unity Catalog catalog holding the inference tables (each service's exact table is discovered at runtime) |
-    | `MLFLOW_SCHEMA`| MLflow traces stored in the table |
+    | `CLAUDE_MODEL_SERVICE` | Fully-qualified name of the Claude service; sent as the `model` field |
+    | `CLAUDE_MODEL` | Model it routes to, e.g. `databricks-claude-opus-4-8`. Display label only |
+    | `OPENAI_MODEL_SERVICE` | Fully-qualified name of the OpenAI service |
+    | `OPENAI_MODEL` | Model it routes to, e.g. `databricks-gpt-5-6-sol`. Display label only |
+    | `GEMINI_MODEL_SERVICE` | Fully-qualified name of the Gemini service |
+    | `GEMINI_MODEL` | Model it routes to, e.g. `databricks-gemini-3-6-flash`. Display label only |
+    | `UC_CATALOG` | Catalog holding the inference tables; each service's table is discovered at runtime |
+    | `MLFLOW_SCHEMA` | Schema holding the MLflow trace tables |
 
-2. Install dependencies and launch the notebook:
+2. Install and launch:
 
     ```bash
     uv sync
     jupyter notebook ai_gateway_demo.ipynb
     ```
 
-3. Run Acts 1–3 and Act 6 interactively (these execute code against the model services).
+3. Run Acts 1–3 and Act 6 interactively. These call the model services directly.
 
-   > **Acts 4 and 5 require a Databricks workspace.** They use Databricks Genie to query the three inference tables — deploy the notebook to Databricks (see below) and open the Genie space alongside it to use the provided questions. **Act 6 (Rate Limiting)** also requires QPM/TPM limits configured on each model service (step 5 above).
+   > Acts 4 and 5 need a Databricks workspace, since they drive Genie against the inference tables. Deploy the notebook (below) and keep the Genie space open beside it. Act 6 also needs QPM/TPM limits configured.
 
 ## Deploying to Databricks
 
-This project uses [Declarative Automation Bundles](https://docs.databricks.com/en/dev-tools/bundles/index.html) to deploy the notebook and all supporting modules to a Databricks workspace.
+The project uses [Declarative Automation Bundles](https://docs.databricks.com/en/dev-tools/bundles/index.html) to push the notebook and its modules to a workspace.
 
-1. Install the Databricks CLI (if not already installed):
+1. Install the CLI:
 
     ```bash
     brew install databricks/tap/databricks
     ```
 
-2. Authenticate with your workspace:
+2. Authenticate:
 
     ```bash
     databricks auth login --host https://<your-workspace>.cloud.databricks.com
@@ -199,9 +196,9 @@ This project uses [Declarative Automation Bundles](https://docs.databricks.com/e
     databricks bundle deploy
     ```
 
-4. Open `ai_gateway_demo` in your Databricks workspace and run Acts 1–6 interactively. The notebook auto-detects the Databricks runtime and fetches host/token via `dbutils` — no `.env` file needed.
+4. Open `ai_gateway_demo` in the workspace and run the acts. The notebook detects the Databricks runtime and pulls host and token from `dbutils`, so no `.env` is needed.
 
-> **Tip:** Update `databricks.yml` to change the target workspace or add additional targets (e.g., staging, production).
+> **Tip:** edit `databricks.yml` to change the target workspace or add targets such as staging and production.
 
 ## File structure
 
@@ -209,14 +206,14 @@ This project uses [Declarative Automation Bundles](https://docs.databricks.com/e
 unity_ai_gateway_governance/
 ├── databricks.yml          # Declarative Automation Bundle configuration
 ├── ai_gateway_demo.ipynb   # Demo notebook (runs locally and on Databricks)
-├── gateway_config.py       # GatewayConfig + verification and deployed-config lookup per model service
-├── agent_simulator.py      # SimulatedAgent, GatewayClient, policy-block detection, request retry
+├── gateway_config.py       # GatewayConfig + per-service verification and config lookup
+├── agent_simulator.py      # SimulatedAgent, GatewayClient, policy-block detection, retries
 ├── scenarios.py            # Guardrail payloads (PII, injection, unsafe) + clean-scenario builder
-├── clean_tasks.py          # Catalog of 15 realistic coding tasks per agent (10 used by default)
-├── prompts.py              # System prompts for each coding agent persona
-├── observability.py        # SQL query templates for inference tables
+├── clean_tasks.py          # 15 coding tasks per agent (10 used by default)
+├── prompts.py              # System prompt per agent persona
+├── observability.py        # SQL query templates for the inference tables
 ├── images/
 │   └── ai_gateway_architecture.png
-├── env-template            # Environment variable template (local use)
+├── env-template            # Environment variable template (local runs)
 └── README.md
 ```
